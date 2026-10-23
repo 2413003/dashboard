@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Priorities</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{--bg:#101114;--fg:#eef0f4;--mu:#8a8f9c;--ln:#23252b}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:'Sora',system-ui,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:14px;padding:16px 20px}
+header h1{font-size:15px;font-weight:600;flex:1;display:flex;align-items:center;gap:10px}
+.back{background:none;border:0;color:var(--mu);font:inherit;font-size:20px;cursor:pointer;padding:0 4px}
+.ov{font-size:13px;color:var(--mu)} .ov b{color:var(--fg);font-size:18px;font-weight:700}
+button.t{background:none;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:12px;padding:7px 13px;border-radius:99px;cursor:pointer}
+button.t:hover,button.t.on{background:var(--fg);color:var(--bg)}
+.dot{width:9px;height:9px;border-radius:50%;background:#d9a441;cursor:pointer}
+.dot.ok{background:#5fb87a}.dot.err{background:#d9534f}
+main{flex:1;position:relative;margin:0 20px 20px;min-height:0}
+.tile{position:absolute;padding:3px}
+.tile>div{height:100%;border-radius:10px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;overflow:hidden;transition:filter .15s}
+.tile>div:hover{filter:brightness(1.18)}
+.tile .n{font-weight:600;line-height:1.15}.tile .p{font-weight:700;line-height:1}.tile .s{opacity:.75;font-weight:400}
+.list{max-width:640px;margin:0 auto;overflow:auto;height:100%}
+.row{display:grid;grid-template-columns:1fr 64px 64px 30px;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln);align-items:center}
+.row.h{color:var(--mu);font-size:11px}
+input{background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;width:100%}
+input:disabled{opacity:.5}
+.x{background:none;border:0;color:var(--mu);cursor:pointer;font-size:18px}
+.add{margin:16px 0}
+.tot{color:var(--mu);font-size:12px;margin-top:6px}
+.modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{background:#16181d;border:1px solid var(--ln);border-radius:14px;padding:24px;max-width:460px;width:100%;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.6}
+.box a{color:var(--fg)}.box p{color:var(--mu)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header id="hd"></header>
+<main id="mn"></main>
+<div id="md"></div>
+<script>
+const $=s=>document.querySelector(s), LS=localStorage, FILE='priorities.json', GH='https://api.github.com';
+const uid=()=>Math.random().toString(36).slice(2,9);
+const mk=(n,w)=>({id:uid(),name:n,w,s:5,subs:[]});
+let data;
+try{data=JSON.parse(LS.getItem('pri_data'))}catch(e){}
+if(!data)data={updated:0,items:['Health','Wealth','Relationships','Work','Growth'].map(n=>mk(n,20))};
+let path=null, edit=false, timer, status='wait';
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+
+const cur=()=>path?data.items.find(i=>i.id===path):null;
+const list=()=>path?cur().subs:data.items;
+const score=i=>i.subs.length?i.subs.reduce((a,c)=>a+c.w*score(c),0)/(i.subs.reduce((a,c)=>a+c.w,0)||1):i.s;
+const overall=()=>data.items.reduce((a,c)=>a+c.w*score(c),0)/(data.items.reduce((a,c)=>a+c.w,0)||1);
+const fmt=n=>(Math.round(n*10)/10).toString();
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// keep every list totalling exactly 100
+function balance(l,keep,target){
+  const others=l.filter(x=>x!==keep), rest=100-(keep?keep.w:0), sum=others.reduce((a,c)=>a+c.w,0);
+  if(!others.length){if(keep)keep.w=100;return}
+  others.forEach(o=>o.w=sum>0?Math.round(o.w*rest/sum):Math.round(rest/others.length));
+  const diff=100-l.reduce((a,c)=>a+c.w,0), big=others.slice().sort((a,b)=>b.w-a.w)[0];
+  big.w=Math.max(0,big.w+diff);
+}
+
+// ===== PASTE YOUR FIREBASE SETTINGS HERE =====
+const CFG={apiKey:"AIzaSyD9DTehb3lNWGcr6MbpsfOQ3I55hpwP7aI",authDomain:"dashboard-467f5.firebaseapp.com",projectId:"dashboard-467f5",appId:"1:1069570650154:web:65756f3f661d8c04a01353"};
+// =============================================
+let ref=null;
+function save(){
+  data.updated=Date.now();
+  LS.setItem('pri_data',JSON.stringify(data));
+  status='wait';dots();clearTimeout(timer);timer=setTimeout(push,500);
+}
+async function push(){
+  if(!ref)return;
+  try{await ref.set({json:JSON.stringify(data),updated:data.updated});status='ok'}catch(e){status='err'}
+  dots();
+}
+function dots(){
+  const d=$('.dot');if(!d)return;
+  d.className='dot '+(status==='ok'?'ok':status==='err'?'err':'');
+  d.title={ok:'Saved',wait:'Saving…',err:'Not saved — check connection'}[status]||'';
+}
+function gate(t,m,btn){
+  $('#md').innerHTML=`<div class="modal" style="background:var(--bg)"><div class="box" style="text-align:center;align-items:center"><b style="font-size:18px">${t}</b><p>${m}</p>${btn?'<button class="t" onclick="signin()">Sign in with Google</button>':''}</div></div>`;
+}
+function signin(){firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert(e.message))}
+function init(){
+  if(CFG.apiKey==='PASTE'){gate('Setup needed','Paste your Firebase settings into the CFG block at the top of the script.');return}
+  firebase.initializeApp(CFG);
+  const fdb=firebase.firestore();
+  fdb.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  firebase.auth().onAuthStateChanged(u=>{
+    if(!u){ref=null;gate('Priorities','Sign in to continue.',true);return}
+    $('#md').innerHTML='';
+    ref=fdb.collection('users').doc(u.uid);
+    ref.onSnapshot(s=>{
+      if(!s.exists){push();return}
+      const d=s.data();
+      if(d.updated>data.updated){data=JSON.parse(d.json);LS.setItem('pri_data',d.json);render();status='ok';dots()}
+      else if(d.updated<data.updated)push();
+      else{status='ok';dots()}
+    });
+  });
+}
+
+function render(){
+  const c=cur();
+  $('#hd').innerHTML=`<h1>${c?`<button class="back" onclick="go(null)">‹</button>${esc(c.name)}`:'Priorities'}</h1>
+    <span class="ov"><b>${fmt(c?score(c):overall())}</b> / 10</span>
+    <button class="t ${edit?'on':''}" onclick="edit=!edit;render()">${edit?'Done':'Edit'}</button>
+    <span class="dot" onclick="settings()"></span>`;
+  dots();
+  const m=$('#mn');
+  if(edit){
+    const l=list(), t=l.reduce((a,c)=>a+c.w,0);
+    m.innerHTML=`<div class="list"><div class="row h"><span>Name</span><span>%</span><span>Score</span><span></span></div>`+
+      l.map((x,i)=>`<div class="row"><input value="${esc(x.name)}" onchange="upd(${i},'name',this.value)">
+      <input type="number" min="0" max="100" value="${x.w}" onchange="upd(${i},'w',this.value)">
+      <input type="number" min="0" max="10" step="0.5" value="${fmt(path?x.s:score(x))}" ${!path&&x.subs.length?'disabled title="Calculated from its parts"':''} onchange="upd(${i},'s',this.value)">
+      <button class="x" onclick="del(${i})">×</button></div>`).join('')+
+      `<button class="t add" onclick="add()">+ Add ${path?'part':'priority'}</button><div class="tot">Total ${t}%</div></div>`;
+    return;
+  }
+  const W=m.clientWidth,Hh=m.clientHeight, l=list().filter(x=>x.w>0);
+  if(!l.length){m.innerHTML='<p style="color:var(--mu);padding:20px">Nothing here yet. Tap Edit to add something.</p>';return}
+  m.innerHTML=tm(l,W,Hh).map(r=>{
+    const x=r.c, sc=path?x.s:score(x), a=Math.sqrt(r.w*r.h), fs=Math.max(11,Math.min(a/7,22)), pf=Math.max(14,Math.min(a/3.2,64));
+    return `<div class="tile" style="left:${r.x/W*100}%;top:${r.y/Hh*100}%;width:${r.w/W*100}%;height:${r.h/Hh*100}%">
+      <div style="background:hsl(${sc*12},38%,${24+sc}%)" ${path?'':`onclick="go('${x.id}')"`}>
+      <span class="n" style="font-size:${fs}px">${esc(x.name)}</span>
+      <span class="s" style="font-size:${fs*1.3}px">${fmt(sc)}/10</span></div></div>`}).join('');
+}
+function tm(items,W,H){ // treemap: area = weight
+  const T=items.reduce((a,b)=>a+b.w,0), k=W*H/T, out=[];
+  let rest=[...items].sort((a,b)=>b.w-a.w), x=0,y=0,w=W,h=H;
+  const worst=(r,s)=>{const a=r.reduce((p,c)=>p+c.w*k,0),mx=Math.max(...r.map(c=>c.w*k)),mn=Math.min(...r.map(c=>c.w*k));return Math.max(s*s*mx/(a*a),a*a/(s*s*mn))};
+  while(rest.length){
+    const s=Math.min(w,h);let r=[rest[0]],i=1;
+    while(i<rest.length&&worst([...r,rest[i]],s)<=worst(r,s))r.push(rest[i++]);
+    rest=rest.slice(r.length);
+    const a=r.reduce((p,c)=>p+c.w*k,0);
+    if(w>=h){const cw=a/h;let cy=y;r.forEach(c=>{const ch=c.w*k/cw;out.push({c,x,y:cy,w:cw,h:ch});cy+=ch});x+=cw;w-=cw}
+    else{const rh=a/w;let cx=x;r.forEach(c=>{const cw=c.w*k/rh;out.push({c,x:cx,y,w:cw,h:rh});cx+=cw});y+=rh;h-=rh}
+  }
+  return out;
+}
+function go(id){path=id;edit=false;render()}
+function upd(i,f,v){
+  const l=list(),x=l[i];
+  if(f==='name')x.name=v||'Untitled';
+  else if(f==='s')x.s=Math.max(0,Math.min(10,+v||0));
+  else{x.w=Math.max(0,Math.min(100,Math.round(+v||0)));balance(l,x)}
+  save();render();
+}
+function add(){const l=list(),n=mk('New',Math.round(100/(l.length+1)));l.push(n);balance(l,n);save();render()}
+function del(i){const l=list();l.splice(i,1);if(l.length)balance(l,null);save();render()}
+
+function settings(){
+  const u=firebase.auth().currentUser;
+  $('#md').innerHTML=`<div class="modal" onclick="if(event.target===this)this.remove()"><div class="box">
+  <b style="font-size:15px">Account</b>
+  <p>Signed in as ${u?esc(u.email):''}. Everything is saved to your account automatically.</p>
+  <div class="btns"><button class="t" onclick="dl()">Download backup</button><button class="t" onclick="$('#im').click()">Restore backup</button><button class="t" onclick="firebase.auth().signOut()">Sign out</button></div>
+  <input id="im" type="file" accept=".json" hidden onchange="imp(this.files[0])">
+  </div></div>`;
+}
+function dl(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));a.download='priorities-backup.json';a.click()}
+function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=null;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
+
+addEventListener('resize',()=>{if(!edit)render()});
+render();init();
+</script>
+</body>
+</html>
