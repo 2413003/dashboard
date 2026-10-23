@@ -126,7 +126,7 @@ function render(){
     m.innerHTML=`<div class="list"><div class="row h"><span>Name</span><span>%</span><span>Score</span><span></span><span></span></div>`+
       l.map((x,i)=>`<div class="row"><input value="${esc(x.name)}" onchange="upd(${i},'name',this.value)">
       <input type="number" min="0" max="100" value="${x.w}" onchange="upd(${i},'w',this.value)">
-      <input type="number" min="0" max="10" step="0.5" value="${fmt(score(x))}" ${x.subs.length?'disabled title="Calculated from its parts"':''} onchange="upd(${i},'s',this.value)">
+      <input type="number" min="0" max="10" step="0.5" value="${fmt(score(x))}" onchange="upd(${i},'s',this.value)">
       <button class="x" onclick="down('${x.id}')" title="Open">›</button><button class="x" onclick="del(${i})">×</button></div>`).join('')+
       `<button class="t add" onclick="add()">+ Add ${path.length?'part':'priority'}</button><div class="tot">Total ${t}%</div></div>`;
     return;
@@ -159,12 +159,28 @@ function up(){path=path.slice(0,-1);edit=false;render()}
 function upd(i,f,v){
   const l=list(),x=l[i];
   if(f==='name')x.name=v||'Untitled';
-  else if(f==='s')x.s=Math.max(0,Math.min(10,+v||0));
+  else if(f==='s'){const t=Math.max(0,Math.min(10,+v||0));if(x.subs.length)setScore(x,t);else x.s=t}
   else{x.w=Math.max(0,Math.min(100,Math.round(+v||0)));balance(l,x)}
   save();render();
 }
-function add(){const l=list(),n=mk('New',Math.round(100/(l.length+1)));l.push(n);balance(l,n);save();render()}
-function del(i){const l=list();l.splice(i,1);if(l.length)balance(l,null);save();render()}
+// set a parent's score by shifting every part inside it equally (stops at 0 and 10)
+function setScore(n,t){
+  const lv=[];
+  (function walk(x,f){
+    if(!x.subs.length){lv.push({x,f});return}
+    const T=x.subs.reduce((a,c)=>a+c.w,0);if(!T)return;
+    x.subs.forEach(c=>walk(c,f*c.w/T));
+  })(n,1);
+  for(let k=0;k<12;k++){
+    const d=t-lv.reduce((a,l)=>a+l.f*l.x.s,0);
+    if(Math.abs(d)<1e-6)break;
+    const free=lv.filter(l=>l.f>0&&(d>0?l.x.s<10:l.x.s>0)), fs=free.reduce((a,l)=>a+l.f,0);
+    if(!fs)break;
+    free.forEach(l=>l.x.s=Math.max(0,Math.min(10,l.x.s+d/fs)));
+  }
+}
+function add(){const l=list(),p=cur(),n=mk('New',Math.round(100/(l.length+1)));if(p)n.s=score(p);l.push(n);balance(l,n);save();render()}
+function del(i){const l=list(),p=cur();if(p&&l.length===1)p.s=score(p);l.splice(i,1);if(l.length)balance(l,null);save();render()}
 
 function settings(){
   const u=firebase.auth().currentUser;
