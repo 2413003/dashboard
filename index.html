@@ -39,6 +39,14 @@ input:disabled{opacity:.5}
 .box{background:#16181d;border:1px solid var(--ln);border-radius:14px;padding:24px;max-width:460px;width:100%;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.6}
 .box a{color:var(--fg)}.box p{color:var(--mu)}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
+
+.gal{overflow:auto;height:100%;padding:3px 6px}
+.mas{columns:220px;column-gap:10px}
+.im{break-inside:avoid;margin-bottom:10px;position:relative}
+.im img{width:100%;display:block;border-radius:10px}
+.ph{height:140px;background:#181a1f;border-radius:10px}
+.rm{position:absolute;top:6px;right:6px;background:#000a;color:#fff;width:26px;height:26px;border-radius:50%;font-size:16px;line-height:1;padding:0}
+.ic{padding:7px 9px;display:flex;align-items:center}
 </style>
 </head>
 <body>
@@ -52,7 +60,7 @@ const mk=(n,w)=>({id:uid(),name:n,w,s:5,subs:[]});
 let data;
 try{data=JSON.parse(LS.getItem('pri_data'))}catch(e){}
 if(!data)data={updated:0,items:['Health','Wealth','Relationships','Work','Growth'].map(n=>mk(n,20))};
-let path=[], edit=false, timer, status='wait';
+let path=[], ten=false, edit=false, timer, status='wait';
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 
 const cur=()=>{let n=null,l=data.items;for(const id of path){n=l.find(i=>i.id===id);if(!n)return null;l=n.subs}return n};
@@ -115,12 +123,14 @@ function init(){
 
 function render(){
   const c=cur();
-  $('#hd').innerHTML=`<h1>${c?`<button class="back" onclick="up()">‹</button>${esc(c.name)}`:'Priorities'}</h1>
+  $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="ten=false;edit=false;render()">‹</button>What 10/10 looks like`:c?`<button class="back" onclick="up()">‹</button>${esc(c.name)}`:'Priorities'}</h1>
     <span class="ov"><b>${fmt(c?score(c):overall())}</b> / 10</span>
+    ${c&&!ten?`<button class="t ic" onclick="ten=true;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}
     <button class="t ${edit?'on':''}" onclick="edit=!edit;render()">${edit?'Done':'Edit'}</button>
     <span class="dot" onclick="settings()"></span>`;
   dots();
   const m=$('#mn');
+  if(ten){gallery(m,c);return}
   if(edit){
     const l=list(), t=l.reduce((a,c)=>a+c.w,0);
     m.innerHTML=`<div class="list"><div class="row h"><span>Name</span><span>%</span><span>Score</span><span></span><span></span></div>`+
@@ -154,6 +164,36 @@ function tm(items,W,H){ // treemap: area = weight
   }
   return out;
 }
+// ---- "What 10/10 looks like" image page (images live in their own documents)
+const STAR='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>';
+const imgCache={}, tried=new Set();
+function gallery(m,c){
+  const ids=c.imgs||[], need=ids.filter(i=>!imgCache[i]&&!tried.has(i));
+  if(need.length&&ref){
+    need.forEach(i=>tried.add(i));
+    Promise.all(need.map(i=>ref.collection('images').doc(i).get().then(d=>{if(d.exists)imgCache[i]=d.data().d}).catch(()=>{}))).then(()=>{if(ten)render()});
+  }
+  m.innerHTML=`<div class="gal">${edit?`<button class="t add" onclick="$('#up').click()">+ Add images</button><input id="up" type="file" accept="image/*" multiple hidden onchange="addImgs(this.files)">`:''}${ids.length?`<div class="mas">${ids.map(i=>`<div class="im">${imgCache[i]?`<img src="${imgCache[i]}">`:'<div class="ph"></div>'}${edit?`<button class="x rm" onclick="rmImg('${i}')">×</button>`:''}</div>`).join('')}</div>`:`<p style="color:var(--mu);padding:12px 0">${edit?'Add images that show what a 10/10 looks like.':'Nothing here yet. Tap Edit to add images that show what a 10/10 looks like.'}</p>`}</div>`;
+}
+function shrink(f){return new Promise(res=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,1000/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);res(cv.toDataURL('image/jpeg',.72))};im.onerror=()=>res(null);im.src=u})}
+async function addImgs(files){
+  const c=cur();if(!c||!ref)return;
+  for(const f of [...files]){
+    const d=await shrink(f);if(!d)continue;
+    const id=uid()+uid();
+    try{await ref.collection('images').doc(id).set({d})}catch(e){alert('Could not save the image. Check that your Firestore rules are updated.');return}
+    imgCache[id]=d;(c.imgs=c.imgs||[]).push(id);save();render();
+  }
+}
+function rmImg(id){
+  const c=cur();c.imgs=(c.imgs||[]).filter(i=>i!==id);delete imgCache[id];
+  if(ref)ref.collection('images').doc(id).delete().catch(()=>{});
+  save();render();
+}
+function purge(n){
+  (n.imgs||[]).forEach(i=>{delete imgCache[i];if(ref)ref.collection('images').doc(i).delete().catch(()=>{})});
+  (n.subs||[]).forEach(purge);
+}
 function down(id){path=[...path,id];edit=false;render()}
 function up(){path=path.slice(0,-1);edit=false;render()}
 function upd(i,f,v){
@@ -180,7 +220,7 @@ function setScore(n,t){
   }
 }
 function add(){const l=list(),p=cur(),n=mk('New',Math.round(100/(l.length+1)));if(p)n.s=score(p);l.push(n);balance(l,n);save();render()}
-function del(i){const l=list(),p=cur();if(p&&l.length===1)p.s=score(p);l.splice(i,1);if(l.length)balance(l,null);save();render()}
+function del(i){const l=list(),p=cur();if(p&&l.length===1)p.s=score(p);purge(l[i]);l.splice(i,1);if(l.length)balance(l,null);save();render()}
 
 function settings(){
   const u=firebase.auth().currentUser;
@@ -192,7 +232,7 @@ function settings(){
   </div></div>`;
 }
 function dl(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));a.download='priorities-backup.json';a.click()}
-function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
+function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];ten=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
 
 addEventListener('resize',()=>{if(!edit)render()});
 render();init();
