@@ -173,9 +173,9 @@ function gallery(m,c){
     need.forEach(i=>tried.add(i));
     Promise.all(need.map(i=>ref.collection('images').doc(i).get().then(d=>{if(d.exists)imgCache[i]=d.data().d}).catch(()=>{}))).then(()=>{if(ten)render()});
   }
-  m.innerHTML=`<div class="gal">${edit?`<button class="t add" onclick="$('#up').click()">+ Add images</button><input id="up" type="file" accept="image/*" multiple hidden onchange="addImgs(this.files)">`:''}${ids.length?`<div class="mas">${ids.map(i=>`<div class="im">${imgCache[i]?`<img src="${imgCache[i]}">`:'<div class="ph"></div>'}${edit?`<button class="x rm" onclick="rmImg('${i}')">×</button>`:''}</div>`).join('')}</div>`:`<p style="color:var(--mu);padding:12px 0">${edit?'Add images that show what a 10/10 looks like.':'Nothing here yet. Tap Edit to add images that show what a 10/10 looks like.'}</p>`}</div>`;
+  m.innerHTML=`<div class="gal">${edit?`<button class="t add" onclick="$('#up').click()">+ Add images</button><input id="up" type="file" accept="image/*" multiple hidden onchange="addImgs(this.files)">`:''}${ids.length?`<div class="mas">${ids.map(i=>`<div class="im">${imgCache[i]?`<img src="${imgCache[i]}" ${edit?'':`style="cursor:zoom-in" onclick="zoom('${i}')"`}>`:'<div class="ph"></div>'}${edit?`<button class="x rm" onclick="rmImg('${i}')">×</button>`:''}</div>`).join('')}</div>`:`<p style="color:var(--mu);padding:12px 0">${edit?'Add images that show what a 10/10 looks like.':'Nothing here yet. Tap Edit to add images that show what a 10/10 looks like.'}</p>`}</div>`;
 }
-function shrink(f){return new Promise(res=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,1000/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);res(cv.toDataURL('image/jpeg',.72))};im.onerror=()=>res(null);im.src=u})}
+function shrink(f){return new Promise(res=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,1400/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);let q=.8,d;do{d=cv.toDataURL('image/jpeg',q);q-=.1}while(d.length>900000&&q>.3);res(d)};im.onerror=()=>res(null);im.src=u})}
 async function addImgs(files){
   const c=cur();if(!c||!ref)return;
   for(const f of [...files]){
@@ -194,6 +194,14 @@ function purge(n){
   (n.imgs||[]).forEach(i=>{delete imgCache[i];if(ref)ref.collection('images').doc(i).delete().catch(()=>{})});
   (n.subs||[]).forEach(purge);
 }
+function zoom(id){
+  const z=document.createElement('div');z.id='zm';z.className='modal';
+  z.style.cssText='padding:0;background:#000e;cursor:zoom-out;z-index:9';
+  z.onclick=()=>z.remove();
+  z.innerHTML=`<img src="${imgCache[id]}" style="max-width:100vw;max-height:100vh;object-fit:contain">`;
+  document.body.appendChild(z);
+}
+addEventListener('keydown',e=>{if(e.key==='Escape'){const z=$('#zm');if(z)z.remove()}});
 function down(id){path=[...path,id];edit=false;render()}
 function up(){path=path.slice(0,-1);edit=false;render()}
 function upd(i,f,v){
