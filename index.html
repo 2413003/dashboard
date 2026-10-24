@@ -157,7 +157,7 @@ function render(){
     return `<div class="tile" data-id="${x.id}" onpointerdown="pd(event,'${x.id}')" oncontextmenu="return false" style="left:${r.x/W*100}%;top:${r.y/Hh*100}%;width:${r.w/W*100}%;height:${r.h/Hh*100}%">
       <div style="background:hsl(${sc*12},38%,${24+sc}%)" >
       <span class="n" style="font-size:${fs}px">${esc(x.name)}</span>
-      <span class="s" style="font-size:${fs*1.3}px">${fmt(sc)}/10</span></div></div>`}).join('');
+      <span class="s" style="font-size:13px">${fmt(sc)}/10</span></div></div>`}).join('');
 }
 function tm(items,W,H){ // treemap: area = weight
   const T=items.reduce((a,b)=>a+b.w,0), k=W*H/T, out=[];
