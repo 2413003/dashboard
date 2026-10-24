@@ -53,6 +53,8 @@ input:disabled{opacity:.5}
 .tile.drag{opacity:.35}
 .tile.tgt>div{outline:3px solid #fff;outline-offset:-3px;filter:brightness(1.25)}
 .ghost{position:fixed;z-index:20;transform:translate(-50%,-50%) scale(1.04);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;box-shadow:0 10px 30px #000a;pointer-events:none;max-width:60vw}
+
+.ds{display:block;width:100%;height:calc(100% - 6px);resize:none;background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:15px;line-height:1.7;padding:16px;border-radius:12px}
 </style>
 </head>
 <body>
@@ -66,7 +68,7 @@ const mk=(n,w)=>({id:uid(),name:n,w,s:5,subs:[]});
 let data;
 try{data=JSON.parse(LS.getItem('pri_data'))}catch(e){}
 if(!data)data={updated:0,items:['Health','Wealth','Relationships','Work','Growth'].map(n=>mk(n,20))};
-let path=[], ten=false, edit=false, timer, status='wait';
+let path=[], ten=false, desc=false, edit=false, timer, status='wait';
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 
 const cur=()=>{let n=null,l=data.items;for(const id of path){n=l.find(i=>i.id===id);if(!n)return null;l=n.subs}return n};
@@ -129,14 +131,15 @@ function init(){
 
 function render(){
   const c=cur();
-  $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="ten=false;edit=false;render()">‹</button>What 10/10 looks like`:c?`<button class="back" onclick="up()">‹</button>${esc(c.name)}`:'Priorities'}</h1>
+  $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="ten=false;edit=false;render()">‹</button>What 10/10 looks like`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="up()">‹</button>${esc(c.name)}`:'Priorities'}</h1>
     <span class="ov"><b>${fmt(c?score(c):overall())}</b> / 10</span>
-    ${c&&!ten?`<button class="t ic" onclick="ten=true;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}
-    <button class="t ${edit?'on':''}" onclick="edit=!edit;render()">${edit?'Done':'Edit'}</button>
+    ${c&&!ten&&!desc?`<button class="t ic" onclick="desc=true;edit=false;render()" title="Description">${DESC}</button><button class="t ic" onclick="ten=true;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}
+    ${desc?'':`<button class="t ${edit?'on':''}" onclick="edit=!edit;render()">${edit?'Done':'Edit'}</button>`}
     <span class="dot" onclick="settings()"></span>`;
   dots();
   const m=$('#mn');
   if(ten){gallery(m,c);return}
+  if(desc){descPage(m,c);return}
   if(edit){
     const l=list(), t=l.reduce((a,c)=>a+c.w,0);
     m.innerHTML=`<div class="list"><div class="row h"><span>Name</span><span>%</span><span>Score</span><span></span><span></span></div>`+
@@ -275,6 +278,11 @@ function moveInto(id,tid){
   t.subs.push(n);balance(t.subs,n);
   save();render();
 }
+// ---- description page (edits save as you type)
+const DESC='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>';
+function descPage(m,c){
+  m.innerHTML=`<div class="gal"><textarea class="ds" placeholder="Describe this: what it is, why it matters, what you are aiming for…" oninput="cur().desc=this.value;save()">\n${esc(c.desc||'')}</textarea></div>`;
+}
 function down(id){path=[...path,id];edit=false;render()}
 function up(){path=path.slice(0,-1);edit=false;render()}
 function upd(i,f,v){
@@ -313,7 +321,7 @@ function settings(){
   </div></div>`;
 }
 function dl(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));a.download='priorities-backup.json';a.click()}
-function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];ten=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
+function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];ten=false;desc=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
 
 addEventListener('resize',()=>{if(!edit)render()});
 render();init();
