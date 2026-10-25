@@ -55,6 +55,20 @@ input:disabled{opacity:.5}
 .ghost{position:fixed;z-index:20;transform:translate(-50%,-50%) scale(1.04);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;box-shadow:0 10px 30px #000a;pointer-events:none;max-width:60vw}
 
 .ds{display:block;width:100%;height:calc(100% - 6px);resize:none;background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:15px;line-height:1.7;padding:16px;border-radius:12px}
+
+.fcard{border-radius:12px;padding:18px;margin-bottom:10px;cursor:pointer;display:flex;flex-direction:column;gap:8px}
+.fcard:hover{filter:brightness(1.12)}
+.fcard.top{padding:30px 20px}
+.fc-ch{font-size:12px;opacity:.7}
+.fc-n{font-weight:600;font-size:18px;line-height:1.2}
+.fcard.top .fc-n{font-size:26px}
+.fc-s{font-size:13px;opacity:.75}
+.fcd{border-radius:14px;padding:28px 22px;display:flex;flex-direction:column;gap:14px}
+.fcd .fc-n{font-size:30px}
+.stp{display:flex;align-items:center;gap:14px}
+.stp b{font-size:34px;min-width:2.4ch;text-align:center}
+.stp .t{font-size:20px;width:40px;height:40px;justify-content:center}
+.fdesc{white-space:pre-wrap;opacity:.85;line-height:1.7;font-size:14px}
 </style>
 </head>
 <body>
@@ -68,7 +82,7 @@ const mk=(n,w)=>({id:uid(),name:n,w,s:5,subs:[]});
 let data;
 try{data=JSON.parse(LS.getItem('pri_data'))}catch(e){}
 if(!data)data={updated:0,items:['Health','Wealth','Relationships','Work','Growth'].map(n=>mk(n,20))};
-let path=[], ten=false, desc=false, edit=false, timer, status='wait';
+let path=[], ten=false, desc=false, edit=false, focus=LS.getItem('pri_focus')==='1', timer, status='wait';
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 
 const cur=()=>{let n=null,l=data.items;for(const id of path){n=l.find(i=>i.id===id);if(!n)return null;l=n.subs}return n};
@@ -131,15 +145,17 @@ function init(){
 
 function render(){
   const c=cur();
-  $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="ten=false;edit=false;render()">‹</button>What 10/10 looks like`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="up()">‹</button>${esc(c.name)}`:'Priorities'}</h1>
+  $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="ten=false;edit=false;render()">‹</button>What 10/10 looks like`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
     <span class="ov"><b>${fmt(c?score(c):overall())}</b> / 10</span>
-    ${!ten&&!desc?`<button class="t ic" onclick="desc=true;edit=false;render()" title="Description">${DESC}</button>${c?`<button class="t ic" onclick="ten=true;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}`:''}
-    ${desc?'':`<button class="t ic ${edit?'on':''}" onclick="edit=!edit;render()" title="${edit?'Done':'Edit'}">${edit?CHECK:PEN}</button>`}
+    ${!ten&&!desc&&!(focus&&!c)?`<button class="t ic" onclick="desc=true;edit=false;render()" title="Description">${DESC}</button>${c?`<button class="t ic" onclick="ten=true;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}`:''}
+    ${!ten&&!desc?`<button class="t ic ${focus?'on':''}" onclick="toggleFocus()" title="Focus">${FOCUS}</button>`:''}
+    ${desc||focus?'':`<button class="t ic ${edit?'on':''}" onclick="edit=!edit;render()" title="${edit?'Done':'Edit'}">${edit?CHECK:PEN}</button>`}
     <span class="dot" onclick="settings()"></span>`;
   dots();
   const m=$('#mn');
   if(ten){gallery(m,c);return}
   if(desc){descPage(m,c);return}
+  if(focus){if(c)focusCard(m,c);else feed(m);return}
   if(edit){
     const l=list(), t=l.reduce((a,c)=>a+c.w,0);
     m.innerHTML=`<div class="list"><div class="row h"><span>Name</span><span>%</span><span>Score</span><span></span><span></span></div>`+
@@ -285,6 +301,45 @@ const DESC='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="
 function descPage(m,c){
   m.innerHTML=`<div class="gal"><textarea class="ds" placeholder="Enter description" oninput="(cur()||data).desc=this.value;save()">\n${esc((c||data).desc||'')}</textarea></div>`;
 }
+// ---- Focus mode: every deepest item ranked by how many points it could add to your overall score
+const FOCUS='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>';
+function ranked(){
+  const out=[];
+  const go=(l,f,chain)=>{
+    const T=l.reduce((a,c)=>a+c.w,0);if(!T)return;
+    l.forEach(c=>{
+      if(c.w<=0)return;
+      const g=f*c.w/T,ch=[...chain,c];
+      if(c.subs.length)go(c.subs,g,ch);else out.push({n:c,ch,gain:g*(10-c.s)});
+    });
+  };
+  go(data.items,1,[]);
+  return out.filter(x=>x.gain>0.0005).sort((a,b)=>b.gain-a.gain);
+}
+function feed(m){
+  const r=ranked();
+  if(!r.length){m.innerHTML='<p style="color:var(--mu);padding:20px">Everything is at 10.</p>';return}
+  m.innerHTML=`<div class="gal">${r.map((x,i)=>`<div class="fcard ${i?'':'top'}" style="background:hsl(${x.n.s*12},38%,${24+x.n.s}%)" onclick="openChain('${x.ch.map(c=>c.id).join(',')}')">
+    ${x.ch.length>1?`<span class="fc-ch">${x.ch.slice(0,-1).map(c=>esc(c.name)).join(' › ')}</span>`:''}
+    <span class="fc-n">${esc(x.n.name)}</span><span class="fc-s">${fmt(x.n.s)}/10</span></div>`).join('')}</div>`;
+}
+function openChain(s){path=s.split(',');render()}
+function focusCard(m,c){
+  let l=data.items;const names=[];
+  for(const id of path){const n=l.find(i=>i.id===id);if(!n)break;names.push(n.name);l=n.subs}
+  const sc=score(c);
+  m.innerHTML=`<div class="gal"><div class="fcd" style="background:hsl(${sc*12},38%,${24+sc}%)">
+    ${names.length>1?`<span class="fc-ch">${names.slice(0,-1).map(esc).join(' › ')}</span>`:''}
+    <span class="fc-n">${esc(c.name)}</span>
+    <div class="stp"><button class="t" onclick="fstep(-.5)">−</button><b>${fmt(sc)}</b><span class="fc-s">/10</span><button class="t" onclick="fstep(.5)">+</button></div>
+    ${c.desc?`<p class="fdesc">${esc(c.desc)}</p>`:''}</div></div>`;
+}
+function fstep(d){
+  const c=cur(),t=Math.max(0,Math.min(10,score(c)+d));
+  if(c.subs.length)setScore(c,t);else c.s=t;
+  save();render();
+}
+function toggleFocus(){focus=!focus;LS.setItem('pri_focus',focus?'1':'0');path=[];edit=false;render()}
 function down(id){path=[...path,id];edit=false;render()}
 function up(){path=path.slice(0,-1);edit=false;render()}
 function upd(i,f,v){
