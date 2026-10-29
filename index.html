@@ -48,6 +48,23 @@ input:disabled{opacity:.5}
 .rm{position:absolute;top:6px;right:6px;background:#000a;color:#fff;width:26px;height:26px;border-radius:50%;font-size:16px;line-height:1;padding:0}
 .ic{padding:7px 9px;display:flex;align-items:center}
 
+.pg{max-width:640px;margin:0 auto}
+.pg .im{margin-bottom:12px}
+.tx{display:block;width:100%;background:#181a1f;border:1px solid var(--ln);border-radius:10px;padding:14px;color:var(--fg);font:inherit;font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+textarea.tx{min-height:96px;resize:none;overflow:hidden;padding-right:40px}
+.vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+.vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vd{display:block;width:100%;border-radius:10px;background:#000}
+.lk{display:flex;flex-direction:column;gap:4px;padding:14px;background:#181a1f;border:1px solid var(--ln);border-radius:10px;color:var(--fg);text-decoration:none;font-size:13px}
+.lk small{color:var(--mu);word-break:break-all}
+.pc{background:#181a1f;border:1px solid var(--ln);border-radius:10px;overflow:hidden;cursor:pointer}
+.pc:hover{border-color:var(--mu)}
+.pc img,.pc .ph{border-radius:0}
+.pb{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.pb b{font-size:14px;font-weight:600}
+.pb p{font-size:13px;color:var(--mu);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pb span{font-size:11px;color:var(--mu)}
+
 .tile{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .tile.hold>div{transform:scale(.95);transition:transform 3s linear}
 .tile.drag{opacity:.35}
@@ -82,7 +99,7 @@ const mk=(n,w)=>({id:uid(),name:n,w,s:5,subs:[]});
 let data;
 try{data=JSON.parse(LS.getItem('pri_data'))}catch(e){}
 if(!data)data={updated:0,items:['Health','Wealth','Relationships','Work','Growth'].map(n=>mk(n,20))};
-let path=[], ten=false, desc=false, edit=false, focus=LS.getItem('pri_focus')==='1', timer, status='wait';
+let path=[], ten=false, prof=null, desc=false, edit=false, focus=LS.getItem('pri_focus')==='1', timer, status='wait';
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 
 const cur=()=>{let n=null,l=data.items;for(const id of path){n=l.find(i=>i.id===id);if(!n)return null;l=n.subs}return n};
@@ -145,9 +162,10 @@ function init(){
 
 function render(){
   const c=cur();
-  $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="ten=false;edit=false;render()">‹</button>What 10/10 looks like`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
+  if(ten&&prof&&!pf())prof=null;
+  $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="${prof?'prof=null':'ten=false;edit=false'};render()">‹</button><span id="ttl">${prof?esc((pf().name||'').trim()||'Untitled'):'What 10/10 looks like'}</span>`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
     <span class="ov"><b>${fmt(c?score(c):overall())}</b> / 10</span>
-    ${!ten&&!desc&&!(focus&&!c)?`<button class="t ic" onclick="desc=true;edit=false;render()" title="Description">${DESC}</button>${c?`<button class="t ic" onclick="ten=true;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}`:''}
+    ${!ten&&!desc&&!(focus&&!c)?`<button class="t ic" onclick="desc=true;edit=false;render()" title="Description">${DESC}</button>${c?`<button class="t ic" onclick="ten=true;prof=null;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}`:''}
     ${!ten&&!desc?`<button class="t ic ${focus?'on':''}" onclick="toggleFocus()" title="Focus">${FOCUS}</button>`:''}
     ${desc||focus?'':`<button class="t ic ${edit?'on':''}" onclick="edit=!edit;render()" title="${edit?'Done':'Edit'}">${edit?CHECK:PEN}</button>`}
     <span class="dot" onclick="settings()"></span>`;
@@ -189,39 +207,125 @@ function tm(items,W,H){ // treemap: area = weight
   }
   return out;
 }
-// ---- "What 10/10 looks like" image page (images live in their own documents)
+// ---- "What 10/10 looks like" page: images, text, videos and profiles (image data lives in its own documents)
 const STAR='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>';
 const imgCache={}, tried=new Set();
+// examples can be: image, text, video, or a profile that groups several of those
+function exs(c){if(c.imgs){c.ex=(c.ex||[]).concat(c.imgs.map(id=>({id,t:'img'})));delete c.imgs}return c.ex=c.ex||[]}
+function pf(){const c=cur();return c&&prof?exs(c).find(e=>e.id===prof)||null:null}
+function box(){const c=cur();if(!c)return null;const p=pf();return p?p.blocks:exs(c)}
+function loadImgs(ids){
+  const need=ids.filter(i=>!imgCache[i]&&!tried.has(i));
+  if(!need.length||!ref)return;
+  need.forEach(i=>tried.add(i));
+  Promise.all(need.map(i=>ref.collection('images').doc(i).get().then(d=>{if(d.exists)imgCache[i]=d.data().d}).catch(()=>{}))).then(()=>{
+    const a=document.activeElement;
+    if(ten&&!(a&&a.matches('textarea,input')))render();
+  });
+}
+function normUrl(u){
+  u=(u||'').trim();if(!u)return null;
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(u))u='https://'+u;
+  return /^https?:\/\/[^\s\/]+\.[^\s]+/i.test(u)?u:null;
+}
+function vidEmbed(u){
+  let m=u.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/))([\w-]{11})/);
+  if(m)return{k:'f',src:'https://www.youtube-nocookie.com/embed/'+m[1]};
+  m=u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if(m)return{k:'f',src:'https://player.vimeo.com/video/'+m[1]};
+  if(/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u))return{k:'v',src:u};
+  return null;
+}
+function vidHTML(e){
+  const v=vidEmbed(e.url||'');
+  if(!v){let h=e.url;try{h=new URL(e.url).hostname.replace(/^www\./,'')}catch(x){}
+    return `<a class="lk" href="${esc(e.url||'')}" target="_blank" rel="noopener"><b>${esc(h)}</b><small>${esc(e.url||'')}</small></a>`}
+  if(v.k==='f')return `<div class="vid"><iframe src="${v.src}" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+  return `<video class="vd" src="${esc(v.src)}" controls preload="metadata" playsinline></video>`;
+}
+function profCard(e){
+  const im=e.blocks.find(b=>b.t==='img'), tx=e.blocks.find(b=>b.t==='text'&&(b.text||'').trim()), n=e.blocks.length;
+  return `<div class="pc" onclick="openProf('${e.id}')">${im?(imgCache[im.id]?`<img src="${imgCache[im.id]}">`:'<div class="ph"></div>'):''}
+    <div class="pb"><b>${esc((e.name||'').trim()||'Untitled')}</b>${tx?`<p>${esc(tx.text)}</p>`:''}<span>${n?n+(n>1?' items':' item'):'Empty'}</span></div></div>`;
+}
+function exHTML(e){
+  let b='';
+  if(e.t==='img')b=imgCache[e.id]?`<img src="${imgCache[e.id]}" ${edit?'':`style="cursor:zoom-in" onclick="zoom('${e.id}')"`}>`:'<div class="ph"></div>';
+  else if(e.t==='text')b=edit?`<textarea class="tx" placeholder="Write something…" oninput="setTx('${e.id}',this.value);grow(this)">\n${esc(e.text||'')}</textarea>`:`<div class="tx">${esc(e.text||'')}</div>`;
+  else if(e.t==='vid')b=vidHTML(e);
+  else if(e.t==='prof')b=profCard(e);
+  return `<div class="im">${b}${edit?`<button class="x rm" onclick="rmEx('${e.id}')">×</button>`:''}</div>`;
+}
+function grow(t){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px'}
 function gallery(m,c){
-  const ids=c.imgs||[], need=ids.filter(i=>!imgCache[i]&&!tried.has(i));
-  if(need.length&&ref){
-    need.forEach(i=>tried.add(i));
-    Promise.all(need.map(i=>ref.collection('images').doc(i).get().then(d=>{if(d.exists)imgCache[i]=d.data().d}).catch(()=>{}))).then(()=>{if(ten)render()});
-  }
-  m.innerHTML=`<div class="gal">${edit||!ids.length?`<button class="t add" onclick="$('#up').click()">+ Add images</button><input id="up" type="file" accept="image/*" multiple hidden onchange="addImgs(this.files)">`:''}${ids.length?`<div class="mas">${ids.map(i=>`<div class="im">${imgCache[i]?`<img src="${imgCache[i]}" ${edit?'':`style="cursor:zoom-in" onclick="zoom('${i}')"`}>`:'<div class="ph"></div>'}${edit?`<button class="x rm" onclick="rmImg('${i}')">×</button>`:''}</div>`).join('')}</div>`:`<p style="color:var(--mu);padding:12px 0">Add images that show what a 10/10 looks like.</p>`}</div>`;
+  const p=pf(), all=p?p.blocks:exs(c);
+  const items=edit?all:all.filter(e=>e.t!=='text'||(e.text||'').trim());
+  const ids=[];
+  items.forEach(e=>{
+    if(e.t==='img')ids.push(e.id);
+    else if(e.t==='prof'){const f=e.blocks.find(b=>b.t==='img');if(f)ids.push(f.id)}
+  });
+  loadImgs(ids);
+  const bar=edit||!items.length?`<div class="btns add"><button class="t" onclick="$('#up').click()">+ Image</button><button class="t" onclick="addText()">+ Text</button><button class="t" onclick="addVid()">+ Video</button>${p?'':'<button class="t" onclick="addProf()">+ Profile</button>'}<input id="up" type="file" accept="image/*" multiple hidden onchange="addImgs(this.files)"></div>`:'';
+  const empty=items.length?'':`<p style="color:var(--mu);padding:12px 0">${p?'Add images, text or videos to this profile.':'Add images, text, videos or profiles that show what a 10/10 looks like.'}</p>`;
+  const body=p
+    ?`<div class="pg">${edit?`<input value="${esc(p.name||'')}" placeholder="Profile name" oninput="renameProf(this.value)">`:''}${bar}${items.map(exHTML).join('')}${empty}</div>`
+    :`${bar}${items.length?`<div class="mas">${items.map(exHTML).join('')}</div>`:empty}`;
+  m.innerHTML=`<div class="gal">${body}</div>`;
+  m.querySelectorAll('textarea.tx').forEach(grow);
 }
 function shrink(f){return new Promise(res=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,1400/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);let q=.8,d;do{d=cv.toDataURL('image/jpeg',q);q-=.1}while(d.length>900000&&q>.3);res(d)};im.onerror=()=>res(null);im.src=u})}
 async function addImgs(files){
-  const c=cur();if(!c||!ref)return;
+  const l=box();if(!l||!ref)return;
   for(const f of [...files]){
     const d=await shrink(f);if(!d)continue;
     const id=uid()+uid();
     try{await ref.collection('images').doc(id).set({d})}catch(e){alert('Could not save the image. Check that your Firestore rules are updated.');return}
-    imgCache[id]=d;(c.imgs=c.imgs||[]).push(id);save();render();
+    imgCache[id]=d;l.push({id,t:'img'});save();if(ten)render();
   }
 }
-function rmImg(id){
-  const c=cur();c.imgs=(c.imgs||[]).filter(i=>i!==id);delete imgCache[id];
-  if(ref)ref.collection('images').doc(id).delete().catch(()=>{});
-  save();render();
+function addText(){
+  const l=box();if(!l)return;
+  l.push({id:uid(),t:'text',text:''});edit=true;save();render();
+  setTimeout(()=>{const a=document.querySelectorAll('#mn textarea.tx'),t=a[a.length-1];if(t)t.focus()},0);
 }
-function purge(n){
-  (n.imgs||[]).forEach(i=>{delete imgCache[i];if(ref)ref.collection('images').doc(i).delete().catch(()=>{})});
-  (n.subs||[]).forEach(purge);
+function setTx(id,v){const e=(box()||[]).find(x=>x.id===id);if(e){e.text=v;save()}}
+function addVid(){
+  $('#md').innerHTML=`<div class="modal" onclick="if(event.target===this)this.remove()"><div class="box"><b style="font-size:15px">Add a video</b><p>Paste a YouTube or Vimeo link, or a direct link to an .mp4 file. Other links are added as a link card.</p><input id="vu" placeholder="https://" onkeydown="if(event.key==='Enter')saveVid()"><div class="btns"><button class="t" onclick="saveVid()">Add</button><button class="t" onclick="$('#md').innerHTML=''">Cancel</button></div></div></div>`;
+  setTimeout(()=>{const i=$('#vu');if(i)i.focus()},0);
 }
+function saveVid(){
+  const u=normUrl($('#vu').value);
+  if(!u){alert("That doesn't look like a web link.");return}
+  const l=box();if(!l)return;
+  l.push({id:uid(),t:'vid',url:u});$('#md').innerHTML='';save();render();
+}
+function addProf(){
+  const l=box();if(!l)return;
+  const e={id:uid(),t:'prof',name:'',blocks:[]};
+  l.push(e);prof=e.id;edit=true;save();render();
+  setTimeout(()=>{const i=$('#mn .pg input');if(i)i.focus()},0);
+}
+function openProf(id){prof=id;render()}
+function renameProf(v){
+  const p=pf();if(!p)return;
+  p.name=v;save();
+  const t=$('#ttl');if(t)t.textContent=v.trim()||'Untitled';
+}
+function killEx(e){
+  if(e.t==='img'){delete imgCache[e.id];if(ref)ref.collection('images').doc(e.id).delete().catch(()=>{})}
+  else if(e.t==='prof')e.blocks.forEach(killEx);
+}
+function rmEx(id){
+  const l=box(),i=l?l.findIndex(e=>e.id===id):-1;if(i<0)return;
+  const e=l[i];
+  if(e.t==='prof'&&e.blocks.length&&!confirm('Delete this profile and everything in it?'))return;
+  killEx(e);l.splice(i,1);save();render();
+}
+function purge(n){exs(n).forEach(killEx);(n.subs||[]).forEach(purge)}
 let zl=[],zi=0;
 function zoom(id){
-  zl=(cur().imgs||[]).filter(k=>imgCache[k]);zi=zl.indexOf(id);
+  zl=(box()||[]).filter(e=>e.t==='img'&&imgCache[e.id]).map(e=>e.id);zi=zl.indexOf(id);
   const z=document.createElement('div');z.id='zm';z.className='modal';
   z.style.cssText='padding:0;background:#000e;cursor:zoom-out;z-index:9';
   z.onclick=()=>z.remove();
@@ -378,7 +482,7 @@ function settings(){
   </div></div>`;
 }
 function dl(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));a.download='priorities-backup.json';a.click()}
-function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];ten=false;desc=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
+function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];ten=false;prof=null;desc=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
 
 addEventListener('resize',()=>{if(!edit&&!desc)render()});
 render();init();
