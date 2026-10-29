@@ -48,6 +48,7 @@ input:disabled{opacity:.5}
 .rm{position:absolute;top:6px;right:6px;background:#000a;color:#fff;width:26px;height:26px;border-radius:50%;font-size:16px;line-height:1;padding:0}
 .ic{padding:7px 9px;display:flex;align-items:center}
 
+.vfs{width:100%;margin-top:6px;padding:6px 10px;display:flex;justify-content:center;align-items:center;gap:6px}
 .pg{max-width:640px;margin:0 auto}
 .pg .im{margin-bottom:12px}
 .tx{display:block;width:100%;background:#181a1f;border:1px solid var(--ln);border-radius:10px;padding:14px;color:var(--fg);font:inherit;font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -252,9 +253,26 @@ function exHTML(e){
   let b='';
   if(e.t==='img')b=imgCache[e.id]?`<img src="${imgCache[e.id]}" ${edit?'':`style="cursor:zoom-in" onclick="zoom('${e.id}')"`}>`:'<div class="ph"></div>';
   else if(e.t==='text')b=edit?`<textarea class="tx" placeholder="Write something…" oninput="setTx('${e.id}',this.value);grow(this)">\n${esc(e.text||'')}</textarea>`:`<div class="tx">${esc(e.text||'')}</div>`;
-  else if(e.t==='vid')b=vidHTML(e);
+  else if(e.t==='vid')b=vidHTML(e)+(vidEmbed(e.url||'')?`<button class="t vfs" onclick="fsVid('${e.id}')">${EXP} Fullscreen</button>`:'');
   else if(e.t==='prof')b=profCard(e);
   return `<div class="im">${b}${edit?`<button class="x rm" onclick="rmEx('${e.id}')">×</button>`:''}</div>`;
+}
+const EXP='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+function fsVid(id){
+  const e=(box()||[]).find(x=>x.id===id),v=e&&vidEmbed(e.url||'');if(!v||$('#vm'))return;
+  const z=document.createElement('div');z.id='vm';
+  z.style.cssText='position:fixed;inset:0;z-index:30;background:#000;display:flex;align-items:center;justify-content:center';
+  z.innerHTML=(v.k==='f'
+    ?`<iframe src="${v.src}?autoplay=1" allow="autoplay; accelerometer; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" style="width:100%;height:100%;border:0"></iframe>`
+    :`<video src="${esc(v.src)}" controls autoplay playsinline style="width:100%;height:100%"></video>`)
+    +`<button class="x" onclick="closeVid()" title="Close" style="position:absolute;top:12px;right:14px;width:40px;height:40px;border-radius:50%;background:#000a;color:#fff;font-size:26px;line-height:1;padding:0">×</button>`;
+  document.body.appendChild(z);
+  try{const r=z.requestFullscreen&&z.requestFullscreen();if(r&&r.catch)r.catch(()=>{})}catch(x){}
+}
+function closeVid(){
+  const z=$('#vm');
+  try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{})}catch(x){}
+  if(z)z.remove();
 }
 function grow(t){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px'}
 function gallery(m,c){
@@ -338,6 +356,7 @@ function zstep(d){
   $('#zimg').src=imgCache[zl[zi]];
 }
 addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&$('#vm')){closeVid();return}
   const z=$('#zm');if(!z)return;
   if(e.key==='Escape')z.remove();
   else if(e.key==='ArrowRight')zstep(1);
