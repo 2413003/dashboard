@@ -569,27 +569,24 @@ function home(){
   $('#hd').innerHTML=`<h1></h1>${PLUSB}${GRIDB}<span class="dot" onclick="settings()"></span>`;
   dots();
   const m=$('#mn'),a=aum();
-  if(!a.length){
-    m.innerHTML=`<div class="home" style="grid-template-columns:1fr;max-width:520px"><div class="card pr"><b>Track your assets under management</b><p class="dl">Tap + at the top to log your AUM. This page then charts how it grows over time.</p></div></div>`;
-    return;
-  }
-  const e=Math.max(Date.now(),a[a.length-1].t),
-    s=rng==='all'?a[0].t:rng==='ytd'?new Date(new Date().getFullYear(),0,1).getTime():e-RNG[rng]*864e5,
-    R=e-s, cur=ser(s,e), pv=rng!=='all'&&vAt(s-R)!=null?ser(s-R,s).map(p=>({t:p.t+R,v:p.v})):[];
+  const E=!a.length;
+  const e=Math.max(Date.now(),E?0:a[a.length-1].t),
+    s=rng==='all'?(E?e-90*864e5:a[0].t):rng==='ytd'?new Date(new Date().getFullYear(),0,1).getTime():e-RNG[rng]*864e5,
+    R=e-s, cur=E?[{t:s,v:0},{t:e,v:0}]:ser(s,e), pv=!E&&rng!=='all'&&vAt(s-R)!=null?ser(s-R,s).map(p=>({t:p.t+R,v:p.v})):[];
   const last=cur[cur.length-1].v, base=cur[0].v, dl=last-base, pc=base>0?dl/base*100:null,
     vals=[...cur,...pv].map(p=>p.v), lo0=Math.min(...vals), hi0=Math.max(...vals),
-    pad=(hi0-lo0)*.18||hi0*.05||1, lo=lo0-pad, hi=hi0+pad;
-  const lab=`<span class="${dl<0?'neg':'pos'}">${dl<0?'−':'+'}${gbp(dl)}${pc!=null?` (${pc<0?'−':'+'}${Math.abs(pc).toFixed(1)}%)`:''}</span> ${LAB[rng]}`;
+    pad=(hi0-lo0)*.18||hi0*.05||1, lo=E?0:lo0-pad, hi=E?1000:hi0+pad;
+  const lab=E?'Nothing logged yet':`<span class="${dl<0?'neg':'pos'}">${dl<0?'−':'+'}${gbp(dl)}${pc!=null?` (${pc<0?'−':'+'}${Math.abs(pc).toFixed(1)}%)`:''}</span> ${LAB[rng]}`;
   const u=(()=>{try{return firebase.auth().currentUser}catch(x){return null}})();
   const name=(u&&(u.displayName||u.email))||'You';
-  const feed=a.map((x,i)=>({x,p:a[i-1]})).reverse().map(({x,p})=>{
+  const feed=E?'<div class="card fe"><b>Nothing logged yet</b><p class="fn">Tap + at the top to log your AUM.</p></div>':a.map((x,i)=>({x,p:a[i-1]})).reverse().map(({x,p})=>{
     const d=p?x.v-p.v:null;
     return `<div class="card fe"><div class="fc-ch">${fd(x.t,1)}</div><div class="fv">${gbp(x.v)}</div>${d!=null?`<div class="${d<0?'neg':'pos'}">${d<0?'−':'+'}${gbp(d)}${p.v>0?` (${(Math.abs(d)/p.v*100).toFixed(1)}%)`:''}</div>`:'<div class="fc-s">First update</div>'}${x.note?`<p class="fn">${esc(x.note)}</p>`:''}<button class="x fx" onclick="delAum('${x.id}')" title="Delete">×</button></div>`;
   }).join('');
   const pills=[['1m','1M'],['3m','3M'],['ytd','YTD'],['1y','1Y'],['all','All']].map(([k,l])=>`<button class="t ${rng===k?'on':''}" onclick="rng='${k}';render()">${l}</button>`).join('');
   m.innerHTML=`<div class="home">
     <div class="rail col"><div class="card pr"><div class="av">${esc(name.trim()[0]||'?').toUpperCase()}</div><b>${esc(name)}</b>
-      <div class="st"><span class="fc-s">AUM</span><b>${kf(a[a.length-1].v)}</b></div></div></div>
+      <div class="st"><span class="fc-s">AUM</span><b>${kf(last)}</b></div></div></div>
     <div class="col"><div class="card"><div class="chh"><div><span class="fc-s">Assets under management</span><b class="big" id="hv">${gbp(last)}</b><div class="dl" id="hl">${lab}</div></div><div class="btns">${pills}</div></div>
       <div id="cv"></div>${pv.length?'<div class="lg"><span><i></i>This period</span><span><i class="d"></i>Previous period</span></div>':''}</div>
       ${feed}</div></div>`;
