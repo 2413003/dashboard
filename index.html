@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Priorities</title>
+<title>Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -87,6 +87,35 @@ textarea.tx{min-height:96px;resize:none;overflow:hidden;padding-right:40px}
 .stp b{font-size:34px;min-width:2.4ch;text-align:center}
 .stp .t{font-size:20px;width:40px;height:40px;justify-content:center}
 .fdesc{white-space:pre-wrap;opacity:.85;line-height:1.7;font-size:14px}
+
+input[type=date]{color-scheme:dark}
+.home{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;max-width:980px;margin:0 auto;height:100%;overflow:auto;padding:3px 6px 20px;align-content:start;align-items:start}
+.home>.rail{position:sticky;top:0}
+@media(max-width:760px){.home{grid-template-columns:1fr}.home>.rail{position:static}}
+.card{background:#181a1f;border:1px solid var(--ln);border-radius:12px;padding:18px}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.av{width:56px;height:56px;border-radius:50%;background:#23252b;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600}
+.pr{display:flex;flex-direction:column;gap:14px}
+.pr>b{font-size:16px;overflow-wrap:anywhere}
+.st b{display:block;font-size:15px;margin-top:2px}
+.chh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.big{display:block;font-size:34px;font-weight:700;line-height:1.1;margin:4px 0}
+.dl{font-size:13px;color:var(--mu)}
+.pos{color:#5fb87a}.neg{color:#d9534f}
+.ax{fill:var(--mu);font-size:11px;font-family:inherit}
+.lg{display:flex;gap:16px;font-size:11px;color:var(--mu);margin-top:6px}
+.lg i{display:inline-block;width:14px;border-top:2px solid #5fb87a;margin-right:6px;vertical-align:middle}
+.lg i.d{border-top:2px dashed var(--mu)}
+.fe{position:relative;display:flex;flex-direction:column;gap:4px}
+.fv{font-size:22px;font-weight:600}
+.fn{font-size:13px;color:var(--mu);white-space:pre-wrap;margin-top:4px}
+.fx{position:absolute;top:10px;right:12px}
+.bk{position:fixed;inset:0;z-index:10}
+.apps{position:fixed;top:58px;right:16px;width:268px;background:#16181d;border:1px solid var(--ln);border-radius:14px;padding:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;box-shadow:0 10px 30px #000a;z-index:11}
+.app{background:none;border:0;color:var(--fg);font:inherit;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 4px;border-radius:10px;cursor:pointer}
+.app:hover{background:#23252b}
+.app i{width:42px;height:42px;border-radius:12px;background:#23252b;display:flex;align-items:center;justify-content:center}
+.app.on i{background:var(--fg);color:var(--bg)}
 </style>
 </head>
 <body>
@@ -150,7 +179,7 @@ function init(){
   firebase.auth().onAuthStateChanged(u=>{
     if(!u){ref=null;gate('Priorities','Sign in to continue.',true);return}
     $('#md').innerHTML='';
-    ref=fdb.collection('users').doc(u.uid);
+    ref=fdb.collection('users').doc(u.uid);render();
     ref.onSnapshot(s=>{
       if(!s.exists){push();return}
       const d=s.data();
@@ -162,6 +191,7 @@ function init(){
 }
 
 function render(){
+  if(app==='home'){home();return}
   const c=cur();
   if(ten&&prof&&!pf())prof=null;
   $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="${prof?'prof=null':'ten=false;edit=false'};render()">‹</button><span id="ttl">${prof?esc((pf().name||'').trim()||'Untitled'):'What 10/10 looks like'}</span>`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
@@ -169,7 +199,7 @@ function render(){
     ${!ten&&!desc&&!(focus&&!c)?`<button class="t ic" onclick="desc=true;edit=false;render()" title="Description">${DESC}</button>${c?`<button class="t ic" onclick="ten=true;prof=null;edit=false;render()" title="What 10/10 looks like">${STAR}</button>`:''}`:''}
     ${!ten&&!desc?`<button class="t ic ${focus?'on':''}" onclick="toggleFocus()" title="Focus">${FOCUS}</button>`:''}
     ${desc||focus?'':`<button class="t ic ${edit?'on':''}" onclick="edit=!edit;render()" title="${edit?'Done':'Edit'}">${edit?CHECK:PEN}</button>`}
-    <span class="dot" onclick="settings()"></span>`;
+    ${GRIDB}<span class="dot" onclick="settings()"></span>`;
   dots();
   const m=$('#mn');
   if(ten){gallery(m,c);return}
@@ -502,6 +532,105 @@ function settings(){
 }
 function dl(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));a.download='priorities-backup.json';a.click()}
 function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];ten=false;prof=null;desc=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
+
+// ---- Home: AUM progress (Strava-style) + 9-dot apps menu. Change CUR to switch currency.
+let app='home', rng='all', cx=null;
+const CUR='£', RNG={'1m':30,'3m':91,'1y':365};
+const LAB={'1m':'in the past month','3m':'in the past 3 months','ytd':'this year','1y':'in the past year','all':'since your first update'};
+const aum=()=>data.aum||(data.aum=[]);
+const gbp=n=>CUR+Math.round(Math.abs(n)).toLocaleString('en-GB');
+const kf=n=>{const a=Math.abs(n);return CUR+(a>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'m':a>=1e3?(n/1e3).toFixed(a>=1e5?0:1).replace(/\.0$/,'')+'k':Math.round(n))};
+const fd=(t,y)=>new Date(t).toLocaleDateString('en-GB',y?{day:'numeric',month:'short',year:'numeric'}:{day:'numeric',month:'short'});
+const vAt=t=>{const a=aum();if(!a.length||t<a[0].t)return null;const i=a.findIndex(e=>e.t>t);if(i<0)return a[a.length-1].v;const p=a[i-1],n=a[i];return p.v+(n.v-p.v)*(t-p.t)/(n.t-p.t)};
+function ser(s,e){
+  const v=[],f=vAt(s);
+  if(f!=null)v.push({t:s,v:f});
+  aum().forEach(x=>{if(x.t>s&&x.t<e)v.push(x)});
+  const l=vAt(e);if(l!=null)v.push({t:e,v:l});
+  return v;
+}
+const GRID='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">'+[5,12,19].map(y=>[5,12,19].map(x=>`<circle cx="${x}" cy="${y}" r="1.9"/>`).join('')).join('')+'</svg>';
+const PLUSB=`<button class="t ic" onclick="logAum()" title="Log AUM" aria-label="Log AUM"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>`;
+const GRIDB=`<button class="t ic" onclick="menu()" title="Apps" aria-label="Apps">${GRID}</button>`;
+const SV=p=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const APPS=[
+  {id:'home',n:'Home',i:SV('<path d="M4 20V4M4 20h16M8 15l4-4 3 3 5-6"/>')},
+  {id:'pri',n:'Priorities',i:SV('<rect x="3" y="3" width="11" height="11" rx="2"/><rect x="16" y="3" width="5" height="7" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="12" y="16" width="9" height="5" rx="1.5"/>')}
+];
+function menu(){
+  const o=$('#ap');if(o){o.remove();return}
+  const d=document.createElement('div');d.id='ap';
+  d.innerHTML=`<div class="bk" onclick="menu()"></div><div class="apps">${APPS.map(a=>`<button class="app ${a.id===app?'on':''}" onclick="go('${a.id}')"><i>${a.i}</i>${a.n}</button>`).join('')}</div>`;
+  document.body.appendChild(d);
+}
+function go(id){app=id;const o=$('#ap');if(o)o.remove();render()}
+
+function home(){
+  $('#hd').innerHTML=`<h1></h1>${PLUSB}${GRIDB}<span class="dot" onclick="settings()"></span>`;
+  dots();
+  const m=$('#mn'),a=aum();
+  if(!a.length){
+    m.innerHTML=`<div class="home" style="grid-template-columns:1fr;max-width:520px"><div class="card pr"><b>Track your assets under management</b><p class="dl">Tap + at the top to log your AUM. This page then charts how it grows over time.</p></div></div>`;
+    return;
+  }
+  const e=Math.max(Date.now(),a[a.length-1].t),
+    s=rng==='all'?a[0].t:rng==='ytd'?new Date(new Date().getFullYear(),0,1).getTime():e-RNG[rng]*864e5,
+    R=e-s, cur=ser(s,e), pv=rng!=='all'&&vAt(s-R)!=null?ser(s-R,s).map(p=>({t:p.t+R,v:p.v})):[];
+  const last=cur[cur.length-1].v, base=cur[0].v, dl=last-base, pc=base>0?dl/base*100:null,
+    vals=[...cur,...pv].map(p=>p.v), lo0=Math.min(...vals), hi0=Math.max(...vals),
+    pad=(hi0-lo0)*.18||hi0*.05||1, lo=lo0-pad, hi=hi0+pad;
+  const lab=`<span class="${dl<0?'neg':'pos'}">${dl<0?'−':'+'}${gbp(dl)}${pc!=null?` (${pc<0?'−':'+'}${Math.abs(pc).toFixed(1)}%)`:''}</span> ${LAB[rng]}`;
+  const u=(()=>{try{return firebase.auth().currentUser}catch(x){return null}})();
+  const name=(u&&(u.displayName||u.email))||'You';
+  const feed=a.map((x,i)=>({x,p:a[i-1]})).reverse().map(({x,p})=>{
+    const d=p?x.v-p.v:null;
+    return `<div class="card fe"><div class="fc-ch">${fd(x.t,1)}</div><div class="fv">${gbp(x.v)}</div>${d!=null?`<div class="${d<0?'neg':'pos'}">${d<0?'−':'+'}${gbp(d)}${p.v>0?` (${(Math.abs(d)/p.v*100).toFixed(1)}%)`:''}</div>`:'<div class="fc-s">First update</div>'}${x.note?`<p class="fn">${esc(x.note)}</p>`:''}<button class="x fx" onclick="delAum('${x.id}')" title="Delete">×</button></div>`;
+  }).join('');
+  const pills=[['1m','1M'],['3m','3M'],['ytd','YTD'],['1y','1Y'],['all','All']].map(([k,l])=>`<button class="t ${rng===k?'on':''}" onclick="rng='${k}';render()">${l}</button>`).join('');
+  m.innerHTML=`<div class="home">
+    <div class="rail col"><div class="card pr"><div class="av">${esc(name.trim()[0]||'?').toUpperCase()}</div><b>${esc(name)}</b>
+      <div class="st"><span class="fc-s">AUM</span><b>${kf(a[a.length-1].v)}</b></div></div></div>
+    <div class="col"><div class="card"><div class="chh"><div><span class="fc-s">Assets under management</span><b class="big" id="hv">${gbp(last)}</b><div class="dl" id="hl">${lab}</div></div><div class="btns">${pills}</div></div>
+      <div id="cv"></div>${pv.length?'<div class="lg"><span><i></i>This period</span><span><i class="d"></i>Previous period</span></div>':''}</div>
+      ${feed}</div></div>`;
+  const W=$('#cv').clientWidth||600,H=230,T=16,B=24,h=H-T-B,X=t=>(t-s)/Math.max(e-s,1)*W,Y=v=>T+h-(v-lo)/(hi-lo)*h,
+    P=l=>'M'+l.map(p=>X(p.t).toFixed(1)+' '+Y(p.v).toFixed(1)).join('L');
+  cx={s,e,W,Y,cur:gbp(last),lab};
+  $('#cv').innerHTML=`<svg width="${W}" height="${H}" style="display:block;touch-action:pan-y" onpointermove="hov(event)" onpointerleave="hov()">
+    ${[0,.5,1].map(f=>{const y=T+h*f;return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="var(--ln)"/><text x="${W}" y="${y-5}" text-anchor="end" class="ax">${kf(hi-(hi-lo)*f)}</text>`}).join('')}
+    ${pv.length?`<path d="${P(pv)}" fill="none" stroke="var(--mu)" stroke-width="1.5" stroke-dasharray="4 4"/>`:''}
+    <path d="${P(cur)} L${X(e)} ${T+h} L${X(cur[0].t)} ${T+h}Z" fill="#5fb87a" opacity=".12"/>
+    <path d="${P(cur)}" fill="none" stroke="#5fb87a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(e)}" cy="${Y(last)}" r="4.5" fill="#5fb87a"/>
+    <line id="cl" y1="${T}" y2="${T+h}" stroke="var(--mu)" style="display:none"/><circle id="cd" r="5" fill="#101114" stroke="#5fb87a" stroke-width="2" style="display:none"/>
+    <text x="0" y="${H-6}" class="ax">${fd(s,R>2.5e10)}</text><text x="${W}" y="${H-6}" text-anchor="end" class="ax">${fd(e)===fd(Date.now())?'Today':fd(e)}</text></svg>`;
+}
+// scrub the chart: the big number and date follow your finger or cursor
+function hov(ev){
+  if(!cx)return;
+  const l=$('#cl'),d=$('#cd'),hv=$('#hv'),hl=$('#hl');if(!l)return;
+  const reset=()=>{l.style.display=d.style.display='none';hv.textContent=cx.cur;hl.innerHTML=cx.lab};
+  if(!ev){reset();return}
+  const r=ev.currentTarget.getBoundingClientRect(),x=Math.max(0,Math.min(cx.W,ev.clientX-r.left)),t=cx.s+x/cx.W*(cx.e-cx.s),v=vAt(t);
+  if(v==null){reset();return}
+  l.setAttribute('x1',x);l.setAttribute('x2',x);d.setAttribute('cx',x);d.setAttribute('cy',cx.Y(v));
+  l.style.display=d.style.display='';
+  hv.textContent=gbp(v);hl.textContent=fd(t,1);
+}
+function logAum(){
+  const t=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10),k="onkeydown=\"if(event.key==='Enter')saveAum()\"";
+  $('#md').innerHTML=`<div class="modal" onclick="if(event.target===this)this.remove()"><div class="box"><b style="font-size:15px">Log AUM</b><p>Enter the total assets under management on a date.</p>
+    <input id="av" type="number" inputmode="decimal" min="0" placeholder="Amount (${CUR})" ${k}><input id="ad" type="date" value="${t}"><input id="an" placeholder="Note (optional)" ${k}>
+    <div class="btns"><button class="t" onclick="saveAum()">Save</button><button class="t" onclick="$('#md').innerHTML=''">Cancel</button></div></div></div>`;
+  setTimeout(()=>{const i=$('#av');if(i)i.focus()},0);
+}
+function saveAum(){
+  const v=parseFloat($('#av').value),d=$('#ad').value;
+  if(!(v>=0)||!d){alert('Enter an amount and a date.');return}
+  aum().push({id:uid(),t:new Date(d+'T12:00').getTime(),v,note:$('#an').value.trim()});
+  data.aum.sort((a,b)=>a.t-b.t);$('#md').innerHTML='';save();render();
+}
+function delAum(id){if(!confirm('Delete this update?'))return;data.aum=aum().filter(x=>x.id!==id);save();render()}
 
 addEventListener('resize',()=>{if(!edit&&!desc)render()});
 render();init();
