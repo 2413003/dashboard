@@ -149,11 +149,12 @@ input[type=date]{color-scheme:dark}
 .tkq{display:flex;gap:6px}
 .tkq button{flex:1;padding:9px 0}
 .tkk{margin:8px 0 0 14px;padding-left:12px;border-left:2px solid var(--c);display:flex;flex-direction:column;gap:8px}
-.tke{display:grid;grid-template-columns:22px 1fr 64px 28px 28px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--ln)}
+.tke{display:grid;grid-template-columns:22px minmax(0,1fr) 28px 28px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)}
+.tkl{grid-column:2/-1;display:flex;align-items:center;gap:8px}
+.tkl input{width:80px}
+.tke select{background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:14px;padding:9px 8px;border-radius:8px}
 .tke .x{font-size:20px}
-.tke input[type=number]{padding-left:8px;padding-right:4px}
 .tkd{width:22px;height:22px;border-radius:50%;cursor:pointer}
-.tkhd{color:var(--mu);font-size:11px;border-bottom:0;padding-bottom:0}
 </style>
 </head>
 <body>
@@ -683,7 +684,7 @@ try{tkOpen=new Set(JSON.parse(LS.getItem('tk_open')||'[]'))}catch(e){tkOpen=new 
 const dk=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const d0=k=>new Date(k+'T00:00').getTime();
 const dn=k=>{const d=new Date(d0(k));d.setDate(d.getDate()+1);return d.getTime()};
-const TA=()=>data.time||(data.time={acts:[['Work',6],['Exercise',1],['Learning',1],['Social media',.5],['TV',1]].map((a,i)=>({id:uid(),name:a[0],color:TKC[i],max:a[1]*H1,subs:[]})),log:{},run:null});
+const TA=()=>data.time||(data.time={acts:[],log:{},run:null});
 const tkKey=()=>tkDay||dk(Date.now());
 const tkSubs=n=>n.subs||(n.subs=[]);
 const tkIn=(n,id)=>n.id===id||tkSubs(n).some(c=>tkIn(c,id));
@@ -723,27 +724,40 @@ function tkCard(n,d,c){
     (has?'':`<div class="tkq">${[['−15',-15],['+15',15],['+30',30],['+1h',60]].map(q=>`<button class="t" onclick="tkAdd('${n.id}',${q[1]})">${q[0]}</button>`).join('')}</div>`)+`</div>`+
     (has&&op?`<div class="tkk" style="--c:${c}">${s.map(x=>tkCard(x,d+1,c)).join('')}</div>`:'')+`</div>`;
 }
+const tkU=n=>n.u||(n.max>=H1?'h':'m'); // each limit is entered in minutes or hours
+const tkVal=n=>tkU(n)==='h'?+(n.max/H1).toFixed(2):Math.round(n.max/6e4);
+const tkWarnTxt=n=>{const s=tkSubs(n),sum=s.reduce((a,c)=>a+c.max,0);return s.length&&sum>n.max+6e4?'Sub-activities add up to '+tkF(sum)+', more than the '+tkF(n.max)+' limit.':''};
 function tkRow(n,d,root){
-  const s=tkSubs(n),sum=s.reduce((a,c)=>a+c.max,0);
-  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input value="${esc(n.name)}" onchange="tkUp('${n.id}','name',this.value)"><input type="number" inputmode="decimal" min="0" step="0.25" value="${+(n.max/H1).toFixed(2)}" onchange="tkUp('${n.id}','max',this.value)"><button class="x" onclick="tkNew('${n.id}')" title="Add sub-activity">+</button><button class="x" onclick="tkDel('${n.id}')" title="Delete">×</button></div>`+
-    (s.length&&sum>n.max+6e4?`<div class="tks" style="margin-left:${d*18}px">Sub-activities add up to ${tkF(sum)}, more than the ${tkF(n.max)} limit.</div>`:'')+
-    s.map(c=>tkRow(c,d+1,root)).join('');
+  const u=tkU(n),w=tkWarnTxt(n);
+  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input value="${esc(n.name)}" placeholder="Name" onchange="tkUp('${n.id}','name',this.value)"><button class="x" onclick="tkNew('${n.id}')" title="Add sub-activity">+</button><button class="x" onclick="tkDel('${n.id}')" title="Delete">×</button>
+    <div class="tkl"><span class="tks">Max per day</span><input id="tn-${n.id}" type="number" inputmode="decimal" min="0" step="${u==='h'?.25:5}" value="${tkVal(n)}" onchange="tkUp('${n.id}','max',this.value)"><select onchange="tkUnit('${n.id}',this.value)"><option value="m" ${u==='m'?'selected':''}>minutes</option><option value="h" ${u==='h'?'selected':''}>hours</option></select></div></div>`+
+    `<div class="tks" id="tw-${n.id}" style="margin-left:${d*18}px;${w?'':'display:none'}">${w}</div>`+
+    tkSubs(n).map(c=>tkRow(c,d+1,root)).join('');
 }
+// edits update the data in place (no redraw), so a tap on + or × right after typing is never lost
+function tkWarn(){
+  tkWalk(n=>{const e=$('#tw-'+n.id);if(!e)return;const w=tkWarnTxt(n);e.style.display=w?'':'none';e.textContent=w});
+  const t=$('#tkt');if(t)t.textContent=tkF(TA().acts.reduce((a,c)=>a+c.max,0))+' allocated of 24h';
+}
+function tkUnit(id,v){
+  const x=tkFind(id);if(!x)return;x.n.u=v;
+  const i=$('#tn-'+id);if(i){i.step=v==='h'?.25:5;i.value=tkVal(x.n)}
+  save()}
 function tkRender(){
   const T=TA(),k=tkKey(),today=!tkDay,m=$('#mn');
   $('#hd').innerHTML=`<h1>Time</h1><button class="t ic ${tkEdit?'on':''}" onclick="tkEd()" title="${tkEdit?'Done':'Edit activities'}">${tkEdit?CHECK:PEN}</button>${GRIDB}<span class="dot" onclick="settings()"></span>`;
   dots();
   if(tkEdit){
     const tot=T.acts.reduce((a,c)=>a+c.max,0);
-    m.innerHTML=`<div class="tkw"><p class="tks">Set the most time per day for each activity. Tap + to add a sub-activity inside one, and tap a colour to change it.</p><div class="tke tkhd"><span></span><span>Name</span><span>Max hrs</span><span></span><span></span></div>`+
+    m.innerHTML=`<div class="tkw"><p class="tks">Set the most time per day for each activity, in minutes or hours. Tap + to add a sub-activity inside one, and tap a colour to change it.</p>`+
       T.acts.map(a=>tkRow(a,0,a)).join('')+
-      `<button class="t add" onclick="tkNew()">+ Add activity</button><div class="tks">${tkF(tot)} allocated of 24h</div></div>`;
+      `<button class="t add" onclick="tkNew()">+ Add activity</button><div class="tks" id="tkt">${tkF(tot)} allocated of 24h</div></div>`;
     return}
   const dd=Math.round((d0(dk(Date.now()))-d0(k))/864e5),
     lbl=dd<2?['Today','Yesterday'][dd]:new Date(d0(k)).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
   m.innerHTML=`<div class="tkw"><div class="tknav"><button class="t ic" onclick="tkNav(-1)" aria-label="Previous day">‹</button><b>${lbl}</b><button class="t ic" onclick="tkNav(1)" aria-label="Next day" ${today?'disabled':''}>›</button></div>
-    <div class="card tkh" id="tkh"></div>`+
-    (T.acts.length?T.acts.map(a=>tkCard(a,0,a.color)).join(''):`<p class="tks" style="padding:12px 0">No activities yet. Tap the pen to add some.</p>`)+`</div>`;
+    ${T.acts.length?'<div class="card tkh" id="tkh"></div>':''}`+
+    (T.acts.length?T.acts.map(a=>tkCard(a,0,a.color)).join(''):`<div class="card" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start"><span class="tks">Add the activities you want to track and set a daily limit for each.</span><button class="t" onclick="tkEd();tkNew()">+ Add your first activity</button></div>`)+`</div>`;
   tkPaint();
 }
 function tkPaint(){ // updates numbers, bars and the ring in place (runs every second while a timer is on)
@@ -766,12 +780,12 @@ function tkPaint(){ // updates numbers, bars and the ring in place (runs every s
   h.innerHTML=`<svg width="132" height="132" viewBox="0 0 132 132" style="flex:none"><circle cx="66" cy="66" r="54" fill="none" stroke="#23252b" stroke-width="14"/>${seg}<text x="66" y="68" text-anchor="middle" class="rt">${tkF(tot)}</text><text x="66" y="86" text-anchor="middle" class="ax">of ${tkF(bud)}</text></svg>
     <div class="col" style="gap:4px"><span class="fc-s">Time left</span><b class="big">${tkF(left)}</b>${cnt?`<span class="dl neg">${cnt} limit${cnt>1?'s':''} exceeded</span>`:`<span class="dl">${tkF(tot)} tracked</span>`}</div>`;
 }
-function tkUp(id,f,v){const x=tkFind(id);if(!x)return;if(f==='name')x.n.name=v.trim()||'Untitled';else x.n.max=Math.max(0,+v||0)*H1;save();tkRender()}
+function tkUp(id,f,v){const x=tkFind(id);if(!x)return;const u=tkU(x.n);x.n.u=u;if(f==='name')x.n.name=v.trim()||'Untitled';else x.n.max=Math.max(0,+v||0)*(u==='h'?H1:6e4);save();tkWarn()}
 function tkCol(id){const x=tkFind(id);if(!x)return;x.n.color=TKC[(TKC.indexOf(x.n.color)+1)%TKC.length];save();tkRender()}
 function tkNew(pid){
   const T=TA();
-  if(pid){const x=tkFind(pid);if(!x)return;tkSubs(x.n).push({id:uid(),name:'New sub-activity',max:H1/2,subs:[]});tkOpen.add(pid);LS.setItem('tk_open',JSON.stringify([...tkOpen]))}
-  else T.acts.push({id:uid(),name:'New activity',color:TKC[T.acts.length%TKC.length],max:H1,subs:[]});
+  if(pid){const x=tkFind(pid);if(!x)return;tkSubs(x.n).push({id:uid(),name:'New sub-activity',max:H1/2,u:'m',subs:[]});tkOpen.add(pid);LS.setItem('tk_open',JSON.stringify([...tkOpen]))}
+  else T.acts.push({id:uid(),name:'New activity',color:TKC[T.acts.length%TKC.length],max:H1,u:'h',subs:[]});
   save();tkRender()}
 function tkDel(id){
   const T=TA(),x=tkFind(id);if(!x)return;
