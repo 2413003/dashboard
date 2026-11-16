@@ -165,6 +165,20 @@ input[type=date]{color-scheme:dark}
 .tkmn button:hover{background:#23252b}
 .tkmn .dg{color:#d9534f}
 .tkd{width:22px;height:22px;border-radius:50%;cursor:pointer}
+
+/* ---- Reflect ---- */
+.rfc{padding:2px 16px 6px}
+.rfs{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);padding:16px 0 2px}
+.rfl{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--ln)}
+.rfl:last-child,.rfl:has(+.rfs){border-bottom:0}
+.rfn{flex:none;width:24px;height:24px;border-radius:50%;background:color-mix(in srgb,var(--c) 22%,transparent);color:var(--c);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-top:2px}
+.rfl textarea{flex:1;min-width:0;background:transparent;border:0;outline:none;color:var(--fg);font:inherit;font-size:16px;line-height:1.5;resize:none;overflow:hidden;padding:0;min-height:28px}
+.rfl textarea::placeholder{color:var(--mu)}
+.rfk{cursor:pointer;display:flex;flex-direction:column;gap:8px}
+.rfk:hover{border-color:var(--mu)}
+.rfd{font-size:12px;color:var(--mu)}
+.rft{display:flex;gap:10px;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.rft i{flex:none;width:7px;height:7px;border-radius:50%;margin-top:8px}
 </style>
 </head>
 <body>
@@ -242,6 +256,7 @@ function init(){
 function render(){
   if(app==='home'){home();return}
   if(app==='time'){tkRender();return}
+  if(app==='reflect'){rfRender();return}
   const c=cur();
   if(ten&&prof&&!pf())prof=null;
   $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="${prof?'prof=null':'ten=false;edit=false'};render()">‹</button><span id="ttl">${prof?esc((pf().name||'').trim()||'Untitled'):'What 10/10 looks like'}</span>`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
@@ -608,7 +623,8 @@ const SV=p=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke=
 const APPS=[
   {id:'home',n:'Home',i:SV('<path d="M4 20V4M4 20h16M8 15l4-4 3 3 5-6"/>')},
   {id:'pri',n:'Priorities',i:SV('<rect x="3" y="3" width="11" height="11" rx="2"/><rect x="16" y="3" width="5" height="7" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="12" y="16" width="9" height="5" rx="1.5"/>')},
-  {id:'time',n:'Time',i:SV('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>')}
+  {id:'time',n:'Time',i:SV('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>')},
+  {id:'reflect',n:'Reflect',i:SV('<path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M10 8h5M10 12h5"/>')}
 ];
 function menu(){
   const o=$('#ap');if(o){o.remove();return}
@@ -823,6 +839,49 @@ function tkDel(id){
   if(T.run&&tkIn(x.n,T.run.a))T.run=null;
   x.l.splice(x.i,1);save();tkRender()}
 setInterval(()=>{if(app==='time'&&!tkEdit&&TA().run)tkPaint()},1000);
+
+// ===== REFLECT: 3 good things + 1 thing to improve, every day, with history =====
+let rfDay=null; // null = today
+const rfKey=()=>rfDay||dk(Date.now());
+const RF=()=>data.reflect||(data.reflect={});
+const rfN=r=>r?(r.g||[]).filter(x=>(x||'').trim()).length+((r.i||'').trim()?1:0):0;
+const rfLbl=k=>{
+  const dd=Math.round((d0(dk(Date.now()))-d0(k))/864e5);
+  if(dd<2)return['Today','Yesterday'][dd];
+  const o={weekday:'short',day:'numeric',month:'short'};
+  if(new Date(d0(k)).getFullYear()!==new Date().getFullYear())o.year='numeric';
+  return new Date(d0(k)).toLocaleDateString('en-GB',o)};
+function rfProg(){const e=$('#rfp');if(!e)return;const n=rfN(RF()[rfKey()]);e.textContent=n===4?'All done':n?n+' of 4':''}
+function rfSet(f,n,v){
+  const k=rfKey(),R=RF(),r=R[k]||(R[k]={g:['','',''],i:''});
+  if(f==='g')r.g[n]=v;else r.i=v;
+  if(!rfN(r))delete R[k];
+  save();rfProg()}
+function rfKeyd(e,t){ // Return moves to the next box (Shift+Return for a new line)
+  if(e.key!=='Enter'||e.shiftKey)return;
+  e.preventDefault();
+  const a=[...document.querySelectorAll('.rfl textarea')],n=a[a.indexOf(t)+1];
+  if(n)n.focus();else t.blur()}
+function rfNav(n){
+  const d=new Date(d0(rfKey()));d.setDate(d.getDate()+n);const k=dk(d.getTime());
+  if(k>dk(Date.now()))return;rfDay=k===dk(Date.now())?null:k;rfRender()}
+function rfGo(k){rfDay=k===dk(Date.now())?null:k;rfRender();const w=$('#mn .tkw');if(w)w.scrollTop=0}
+function rfRender(){
+  const k=rfKey(),R=RF(),r=R[k]||{g:['','',''],i:''},today=!rfDay;
+  $('#hd').innerHTML=`<h1>Reflect</h1>${GRIDB}<span class="dot" onclick="settings()"></span>`;
+  dots();
+  const row=(f,n,ph,c,last)=>`<div class="rfl" style="--c:${c}"><span class="rfn">${f==='g'?n+1:'↑'}</span><textarea rows="1" placeholder="${ph}" enterkeyhint="${last?'done':'next'}" autocapitalize="sentences" oninput="rfSet('${f}',${n},this.value);grow(this)" onkeydown="rfKeyd(event,this)">${esc((f==='g'?r.g[n]:r.i)||'')}</textarea></div>`;
+  const past=Object.keys(R).filter(x=>x!==k&&rfN(R[x])).sort().reverse();
+  const hist=past.map(x=>{
+    const e=R[x],ln=[...(e.g||[]).filter(t=>(t||'').trim()).map(t=>['#5fb87a',t]),...((e.i||'').trim()?[['#d9a441',e.i]]:[])];
+    return `<div class="card rfk" onclick="rfGo('${x}')"><span class="rfd">${rfLbl(x)}</span>${ln.map(([c,t])=>`<div class="rft"><i style="background:${c}"></i><span>${esc(t)}</span></div>`).join('')}</div>`}).join('');
+  $('#mn').innerHTML=`<div class="tkw"><div class="tknav"><button class="t ic" onclick="rfNav(-1)" aria-label="Previous day">‹</button><b>${rfLbl(k)}</b><button class="t ic" onclick="rfNav(1)" aria-label="Next day" ${today?'disabled':''}>›</button></div>
+    <div class="tks" id="rfp" style="text-align:center;min-height:15px"></div>
+    <div class="card rfc"><div class="rfs">Three good things</div>${[0,1,2].map(n=>row('g',n,'Something good','#5fb87a',false)).join('')}<div class="rfs">One thing to improve</div>${row('i',0,'What could be better?','#d9a441',true)}</div>
+    ${past.length?`<div class="rfs" style="padding-bottom:0">History</div>${hist}`:''}</div>`;
+  document.querySelectorAll('#mn .rfl textarea').forEach(grow);
+  rfProg();
+}
 
 addEventListener('resize',()=>{if(!edit&&!desc)render()});
 render();init();
