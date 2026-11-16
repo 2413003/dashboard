@@ -119,6 +119,41 @@ input[type=date]{color-scheme:dark}
 .app:hover{background:#23252b}
 .app i{width:42px;height:42px;border-radius:12px;background:#23252b;display:flex;align-items:center;justify-content:center}
 .app.on i{background:var(--fg);color:var(--bg)}
+
+/* ---- Time ---- */
+.tkw{max-width:640px;margin:0 auto;height:100%;overflow:auto;padding:3px 6px 24px;display:flex;flex-direction:column;gap:12px}
+.tknav{display:flex;align-items:center;justify-content:center;gap:16px;font-size:14px;font-weight:600}
+.tknav button:disabled{opacity:.25;cursor:default}
+.tkh{display:flex;align-items:center;gap:22px}
+.rt{fill:var(--fg);font-size:18px;font-weight:700;font-family:inherit}
+.tkg{display:block}
+.tkc{background:#181a1f;border:1px solid var(--ln);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s}
+.tkc.on{border-color:var(--c);box-shadow:0 0 0 1px var(--c) inset}
+.tkc.sb{padding:12px;gap:10px}
+.tkm{display:flex;align-items:center;gap:14px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.tkp{flex:none;width:54px;height:54px;border-radius:50%;background:var(--c);color:#101114;display:flex;align-items:center;justify-content:center}
+.tkc.sb .tkp{width:44px;height:44px}
+.tkf{background:none;border:2px solid var(--c);color:var(--c)}
+.tkc.on .tkp{animation:tkp 1.6s ease-in-out infinite}
+@keyframes tkp{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}60%{box-shadow:0 0 0 10px transparent}}
+@media(prefers-reduced-motion:reduce){.tkc.on .tkp{animation:none}}
+.tki{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.tkr{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tkr b{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tkv{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tkb{height:8px;border-radius:99px;background:#23252b;overflow:hidden}
+.tkb i{display:block;height:100%;border-radius:99px;background:var(--c);transition:width .4s}
+.tks{font-size:12px;color:var(--mu)}
+.tkc.over .tkb i{background:#d9534f}
+.tkc.over .tks{color:#d9534f}
+.tkq{display:flex;gap:6px}
+.tkq button{flex:1;padding:9px 0}
+.tkk{margin:8px 0 0 14px;padding-left:12px;border-left:2px solid var(--c);display:flex;flex-direction:column;gap:8px}
+.tke{display:grid;grid-template-columns:22px 1fr 64px 28px 28px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--ln)}
+.tke .x{font-size:20px}
+.tke input[type=number]{padding-left:8px;padding-right:4px}
+.tkd{width:22px;height:22px;border-radius:50%;cursor:pointer}
+.tkhd{color:var(--mu);font-size:11px;border-bottom:0;padding-bottom:0}
 </style>
 </head>
 <body>
@@ -195,6 +230,7 @@ function init(){
 
 function render(){
   if(app==='home'){home();return}
+  if(app==='time'){tkRender();return}
   const c=cur();
   if(ten&&prof&&!pf())prof=null;
   $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="${prof?'prof=null':'ten=false;edit=false'};render()">‹</button><span id="ttl">${prof?esc((pf().name||'').trim()||'Untitled'):'What 10/10 looks like'}</span>`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
@@ -560,7 +596,8 @@ const GRIDB=`<button class="t ic" onclick="menu()" title="Apps" aria-label="Apps
 const SV=p=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const APPS=[
   {id:'home',n:'Home',i:SV('<path d="M4 20V4M4 20h16M8 15l4-4 3 3 5-6"/>')},
-  {id:'pri',n:'Priorities',i:SV('<rect x="3" y="3" width="11" height="11" rx="2"/><rect x="16" y="3" width="5" height="7" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="12" y="16" width="9" height="5" rx="1.5"/>')}
+  {id:'pri',n:'Priorities',i:SV('<rect x="3" y="3" width="11" height="11" rx="2"/><rect x="16" y="3" width="5" height="7" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="12" y="16" width="9" height="5" rx="1.5"/>')},
+  {id:'time',n:'Time',i:SV('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>')}
 ];
 function menu(){
   const o=$('#ap');if(o){o.remove();return}
@@ -638,6 +675,110 @@ function saveAum(){
   data.aum.sort((a,b)=>a.t-b.t);$('#md').innerHTML='';save();render();
 }
 function delAum(id){if(!confirm('Delete this update?'))return;data.aum=aum().filter(x=>x.id!==id);save();render()}
+
+// ===== TIME: nested activities, daily max per activity, one-tap timer =====
+const TKC=['#5fb87a','#5b9bd5','#d9a441','#c77dba','#e0765b','#4fb8b0','#9a8cf0','#8a8f9c'], H1=36e5;
+let tkDay=null, tkEdit=false, tkOpen; // tkDay null = today
+try{tkOpen=new Set(JSON.parse(LS.getItem('tk_open')||'[]'))}catch(e){tkOpen=new Set()}
+const dk=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const d0=k=>new Date(k+'T00:00').getTime();
+const dn=k=>{const d=new Date(d0(k));d.setDate(d.getDate()+1);return d.getTime()};
+const TA=()=>data.time||(data.time={acts:[['Work',6],['Exercise',1],['Learning',1],['Social media',.5],['TV',1]].map((a,i)=>({id:uid(),name:a[0],color:TKC[i],max:a[1]*H1,subs:[]})),log:{},run:null});
+const tkKey=()=>tkDay||dk(Date.now());
+const tkSubs=n=>n.subs||(n.subs=[]);
+const tkIn=(n,id)=>n.id===id||tkSubs(n).some(c=>tkIn(c,id));
+function tkWalk(fn,l){(l||TA().acts).forEach(n=>{fn(n);tkWalk(fn,tkSubs(n))})}
+function tkFind(id,l){l=l||TA().acts;for(let i=0;i<l.length;i++){if(l[i].id===id)return{n:l[i],l,i};const r=tkFind(id,tkSubs(l[i]));if(r)return r}return null}
+const TK_PLAY='<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>';
+const TK_STOP='<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></svg>';
+const TK_DN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+const TK_UP='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
+function tkF(ms,s){const t=Math.floor(Math.max(0,ms)/1e3),h=Math.floor(t/3600),m=Math.floor(t%3600/60);
+  if(s)return (h?h+'h ':'')+m+'m '+String(t%60).padStart(2,'0')+'s';
+  return h?h+'h'+(m?' '+m+'m':''):m+'m'}
+function tkOwn(id,k){
+  const T=TA(),r=T.run;let u=((T.log[k]||{})[id])||0;
+  if(r&&r.a===id){const s=Math.max(r.t,d0(k)),e=Math.min(Date.now(),dn(k));if(e>s)u+=e-s}
+  return u}
+const tkUsed=(n,k)=>tkOwn(n.id,k)+tkSubs(n).reduce((a,c)=>a+tkUsed(c,k),0); // a parent = its own time + everything inside it
+function tkRaw(id,k,ms){const l=TA().log;l[k]=l[k]||{};l[k][id]=Math.max(0,(l[k][id]||0)+ms)}
+function tkStop(){ // credits the running timer to the day(s) it covered
+  const T=TA(),r=T.run;if(!r)return;let t=r.t;const now=Date.now();
+  while(t<now){const k=dk(t),e=Math.min(now,dn(k));tkRaw(r.a,k,e-t);t=e}
+  T.run=null}
+function tkToggle(id){ // one tap: start; tap again: stop; tap another: switch
+  const r=TA().run;if(r)tkStop();
+  if(!r||r.a!==id)TA().run={a:id,t:Date.now()};
+  if(navigator.vibrate)navigator.vibrate(15);
+  save();tkRender()}
+function tkTog(id){tkOpen.has(id)?tkOpen.delete(id):tkOpen.add(id);LS.setItem('tk_open',JSON.stringify([...tkOpen]));tkRender()}
+function tkAdd(id,m){tkRaw(id,tkKey(),m*6e4);save();tkPaint()}
+function tkNav(n){
+  const d=new Date(d0(tkKey()));d.setDate(d.getDate()+n);const k=dk(d.getTime());
+  if(k>dk(Date.now()))return;tkDay=k===dk(Date.now())?null:k;tkRender()}
+function tkEd(){tkEdit=!tkEdit;tkRender()}
+function tkCard(n,d,c){
+  const T=TA(),s=tkSubs(n),has=s.length,op=tkOpen.has(n.id),on=T.run&&tkIn(n,T.run.a),run=T.run&&T.run.a===n.id;
+  return `<div class="tkg"><div class="tkc ${d?'sb':''} ${on?'on':''}" id="tc-${n.id}" style="--c:${c}"><div class="tkm" onclick="${has?`tkTog('${n.id}')`:`tkToggle('${n.id}')`}"><span class="tkp ${has?'tkf':''}">${has?(op?TK_UP:TK_DN):run?TK_STOP:TK_PLAY}</span><div class="tki"><div class="tkr"><b>${esc(n.name)}</b><span class="tkv" id="tv-${n.id}"></span></div><div class="tkb"><i id="tb-${n.id}"></i></div><span class="tks" id="ts-${n.id}"></span></div></div>`+
+    (has?'':`<div class="tkq">${[['−15',-15],['+15',15],['+30',30],['+1h',60]].map(q=>`<button class="t" onclick="tkAdd('${n.id}',${q[1]})">${q[0]}</button>`).join('')}</div>`)+`</div>`+
+    (has&&op?`<div class="tkk" style="--c:${c}">${s.map(x=>tkCard(x,d+1,c)).join('')}</div>`:'')+`</div>`;
+}
+function tkRow(n,d,root){
+  const s=tkSubs(n),sum=s.reduce((a,c)=>a+c.max,0);
+  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input value="${esc(n.name)}" onchange="tkUp('${n.id}','name',this.value)"><input type="number" inputmode="decimal" min="0" step="0.25" value="${+(n.max/H1).toFixed(2)}" onchange="tkUp('${n.id}','max',this.value)"><button class="x" onclick="tkNew('${n.id}')" title="Add sub-activity">+</button><button class="x" onclick="tkDel('${n.id}')" title="Delete">×</button></div>`+
+    (s.length&&sum>n.max+6e4?`<div class="tks" style="margin-left:${d*18}px">Sub-activities add up to ${tkF(sum)}, more than the ${tkF(n.max)} limit.</div>`:'')+
+    s.map(c=>tkRow(c,d+1,root)).join('');
+}
+function tkRender(){
+  const T=TA(),k=tkKey(),today=!tkDay,m=$('#mn');
+  $('#hd').innerHTML=`<h1>Time</h1><button class="t ic ${tkEdit?'on':''}" onclick="tkEd()" title="${tkEdit?'Done':'Edit activities'}">${tkEdit?CHECK:PEN}</button>${GRIDB}<span class="dot" onclick="settings()"></span>`;
+  dots();
+  if(tkEdit){
+    const tot=T.acts.reduce((a,c)=>a+c.max,0);
+    m.innerHTML=`<div class="tkw"><p class="tks">Set the most time per day for each activity. Tap + to add a sub-activity inside one, and tap a colour to change it.</p><div class="tke tkhd"><span></span><span>Name</span><span>Max hrs</span><span></span><span></span></div>`+
+      T.acts.map(a=>tkRow(a,0,a)).join('')+
+      `<button class="t add" onclick="tkNew()">+ Add activity</button><div class="tks">${tkF(tot)} allocated of 24h</div></div>`;
+    return}
+  const dd=Math.round((d0(dk(Date.now()))-d0(k))/864e5),
+    lbl=dd<2?['Today','Yesterday'][dd]:new Date(d0(k)).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  m.innerHTML=`<div class="tkw"><div class="tknav"><button class="t ic" onclick="tkNav(-1)" aria-label="Previous day">‹</button><b>${lbl}</b><button class="t ic" onclick="tkNav(1)" aria-label="Next day" ${today?'disabled':''}>›</button></div>
+    <div class="card tkh" id="tkh"></div>`+
+    (T.acts.length?T.acts.map(a=>tkCard(a,0,a.color)).join(''):`<p class="tks" style="padding:12px 0">No activities yet. Tap the pen to add some.</p>`)+`</div>`;
+  tkPaint();
+}
+function tkPaint(){ // updates numbers, bars and the ring in place (runs every second while a timer is on)
+  const T=TA(),k=tkKey(),h=$('#tkh');if(!h||tkEdit||app!=='time')return;
+  let tot=0,bud=0,left=0,cnt=0,cum=0,seg='';
+  tkWalk(n=>{
+    const u=tkUsed(n,k),live=T.run&&tkIn(n,T.run.a);
+    if(u>n.max)cnt++;
+    const c=$('#tc-'+n.id);if(!c)return;
+    c.classList.toggle('over',u>n.max);
+    $('#tv-'+n.id).textContent=tkF(u,live);
+    $('#tb-'+n.id).style.width=Math.min(100,n.max?u/n.max*100:(u?100:0))+'%';
+    $('#ts-'+n.id).textContent=u>n.max?tkF(u-n.max)+' over the limit':tkF(n.max-u)+' left of '+tkF(n.max);
+  });
+  T.acts.forEach(a=>{const u=tkUsed(a,k);tot+=u;bud+=a.max;left+=Math.max(0,a.max-u)});
+  T.acts.forEach(a=>{
+    const p=Math.min(bud?tkUsed(a,k)/bud*100:0,100-cum);
+    if(p>.05){seg+=`<circle cx="66" cy="66" r="54" fill="none" stroke="${a.color}" stroke-width="14" pathLength="100" stroke-dasharray="${p} ${100-p}" stroke-dashoffset="${-cum}" transform="rotate(-90 66 66)"/>`;cum+=p}
+  });
+  h.innerHTML=`<svg width="132" height="132" viewBox="0 0 132 132" style="flex:none"><circle cx="66" cy="66" r="54" fill="none" stroke="#23252b" stroke-width="14"/>${seg}<text x="66" y="68" text-anchor="middle" class="rt">${tkF(tot)}</text><text x="66" y="86" text-anchor="middle" class="ax">of ${tkF(bud)}</text></svg>
+    <div class="col" style="gap:4px"><span class="fc-s">Time left</span><b class="big">${tkF(left)}</b>${cnt?`<span class="dl neg">${cnt} limit${cnt>1?'s':''} exceeded</span>`:`<span class="dl">${tkF(tot)} tracked</span>`}</div>`;
+}
+function tkUp(id,f,v){const x=tkFind(id);if(!x)return;if(f==='name')x.n.name=v.trim()||'Untitled';else x.n.max=Math.max(0,+v||0)*H1;save();tkRender()}
+function tkCol(id){const x=tkFind(id);if(!x)return;x.n.color=TKC[(TKC.indexOf(x.n.color)+1)%TKC.length];save();tkRender()}
+function tkNew(pid){
+  const T=TA();
+  if(pid){const x=tkFind(pid);if(!x)return;tkSubs(x.n).push({id:uid(),name:'New sub-activity',max:H1/2,subs:[]});tkOpen.add(pid);LS.setItem('tk_open',JSON.stringify([...tkOpen]))}
+  else T.acts.push({id:uid(),name:'New activity',color:TKC[T.acts.length%TKC.length],max:H1,subs:[]});
+  save();tkRender()}
+function tkDel(id){
+  const T=TA(),x=tkFind(id);if(!x)return;
+  if(!confirm('Delete "'+x.n.name+'"'+(tkSubs(x.n).length?' and everything inside it':'')+'? Its logged time will be hidden.'))return;
+  if(T.run&&tkIn(x.n,T.run.a))T.run=null;
+  x.l.splice(x.i,1);save();tkRender()}
+setInterval(()=>{if(app==='time'&&!tkEdit&&TA().run)tkPaint()},1000);
 
 addEventListener('resize',()=>{if(!edit&&!desc)render()});
 render();init();
