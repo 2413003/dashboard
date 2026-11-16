@@ -732,7 +732,7 @@ function tkNav(n){
 function tkEd(){tkEdit=!tkEdit;tkRender()}
 function tkCard(n,d,c){
   const T=TA(),s=tkSubs(n),has=s.length,op=tkOpen.has(n.id),on=T.run&&tkIn(n,T.run.a),run=T.run&&T.run.a===n.id;
-  return `<div class="tkg"><div class="tkc ${d?'sb':''} ${on?'on':''}" id="tc-${n.id}" style="--c:${c}"><div class="tkm" onclick="${has?`tkTog('${n.id}')`:`tkToggle('${n.id}')`}"><span class="tkp ${has?'tkf':''}">${has?(op?TK_UP:TK_DN):run?TK_STOP:TK_PLAY}</span><div class="tki"><div class="tkr"><b>${esc(n.name)}</b><span class="tkv" id="tv-${n.id}"></span></div><div class="tkb"><i id="tb-${n.id}"></i></div><span class="tks" id="ts-${n.id}"></span></div></div>`+
+  return `<div class="tkg"><div class="tkc ${d?'sb':''} ${on?'on':''}" id="tc-${n.id}" style="--c:${c}"><div class="tkm" onclick="${has?`tkTog('${n.id}')`:`tkToggle('${n.id}')`}"><span class="tkp ${has?'tkf':''}">${has?(op?TK_UP:TK_DN):run?TK_STOP:TK_PLAY}</span><div class="tki"><div class="tkr"><b>${esc(n.name)||'Untitled'}</b><span class="tkv" id="tv-${n.id}"></span></div><div class="tkb"><i id="tb-${n.id}"></i></div><span class="tks" id="ts-${n.id}"></span></div></div>`+
     (has?'':`<div class="tkq">${[['−15',-15],['+15',15],['+30',30],['+1h',60]].map(q=>`<button class="t" onclick="tkAdd('${n.id}',${q[1]})">${q[0]}</button>`).join('')}</div>`)+`</div>`+
     (has&&op?`<div class="tkk" style="--c:${c}">${s.map(x=>tkCard(x,d+1,c)).join('')}</div>`:'')+`</div>`;
 }
@@ -741,7 +741,7 @@ const tkVal=n=>tkU(n)==='h'?+(n.max/H1).toFixed(2):Math.round(n.max/6e4);
 const tkWarnTxt=n=>{const s=tkSubs(n),sum=s.reduce((a,c)=>a+c.max,0);return s.length&&sum>n.max+6e4?'Sub-activities add up to '+tkF(sum)+', more than the '+tkF(n.max)+' limit.':''};
 function tkRow(n,d,root){
   const u=tkU(n),w=tkWarnTxt(n);
-  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input value="${esc(n.name)}" placeholder="Name" onchange="tkUp('${n.id}','name',this.value)"><button class="x" onclick="tkMenu(event,'${n.id}')" title="Options" aria-label="Options">${TK_DOTS}</button>
+  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input id="tr-${n.id}" value="${esc(n.name)}" placeholder="Name" onchange="tkUp('${n.id}','name',this.value)"><button class="x" onclick="tkMenu(event,'${n.id}')" title="Options" aria-label="Options">${TK_DOTS}</button>
     <div class="tkl"><span class="tks">Max per day</span><input id="tn-${n.id}" type="number" inputmode="decimal" min="0" step="${u==='h'?.25:5}" value="${tkVal(n)}" onchange="tkUp('${n.id}','max',this.value)"><select onchange="tkUnit('${n.id}',this.value)"><option value="m" ${u==='m'?'selected':''}>minutes</option><option value="h" ${u==='h'?'selected':''}>hours</option></select></div></div>`+
     `<div class="tks" id="tw-${n.id}" style="margin-left:${d*18}px;${w?'':'display:none'}">${w}</div>`+
     tkSubs(n).map(c=>tkRow(c,d+1,root)).join('');
@@ -801,16 +801,17 @@ function tkPaint(){ // updates numbers, bars and the ring in place (runs every s
   h.innerHTML=`<svg width="132" height="132" viewBox="0 0 132 132" style="flex:none"><circle cx="66" cy="66" r="54" fill="none" stroke="#23252b" stroke-width="14"/>${seg}<text x="66" y="68" text-anchor="middle" class="rt">${tkF(tot)}</text><text x="66" y="86" text-anchor="middle" class="ax">of ${tkF(bud)}</text></svg>
     <div class="col" style="gap:4px"><span class="fc-s">Time left</span><b class="big">${tkF(left)}</b>${cnt?`<span class="dl neg">${cnt} limit${cnt>1?'s':''} exceeded</span>`:`<span class="dl">${tkF(tot)} tracked</span>`}</div>`;
 }
-function tkUp(id,f,v){const x=tkFind(id);if(!x)return;const u=tkU(x.n);x.n.u=u;if(f==='name')x.n.name=v.trim()||'Untitled';else x.n.max=Math.max(0,+v||0)*(u==='h'?H1:6e4);save();tkWarn()}
+function tkUp(id,f,v){const x=tkFind(id);if(!x)return;const u=tkU(x.n);x.n.u=u;if(f==='name')x.n.name=v.trim();else x.n.max=Math.max(0,+v||0)*(u==='h'?H1:6e4);save();tkWarn()}
 function tkCol(id){const x=tkFind(id);if(!x)return;x.n.color=TKC[(TKC.indexOf(x.n.color)+1)%TKC.length];save();tkRender()}
 function tkNew(pid){
-  const T=TA();
-  if(pid){const x=tkFind(pid);if(!x)return;tkSubs(x.n).push({id:uid(),name:'New sub-activity',max:H1/2,u:'m',subs:[]});tkOpen.add(pid);LS.setItem('tk_open',JSON.stringify([...tkOpen]))}
-  else T.acts.push({id:uid(),name:'New activity',color:TKC[T.acts.length%TKC.length],max:H1,u:'h',subs:[]});
-  save();tkRender()}
+  const T=TA(),id=uid();
+  if(pid){const x=tkFind(pid);if(!x)return;tkSubs(x.n).push({id,name:'',max:H1/2,u:'m',subs:[]});tkOpen.add(pid);LS.setItem('tk_open',JSON.stringify([...tkOpen]))}
+  else T.acts.push({id,name:'',color:TKC[T.acts.length%TKC.length],max:H1,u:'h',subs:[]});
+  save();tkRender();
+  setTimeout(()=>{const i=$('#tr-'+id);if(i){i.focus();i.scrollIntoView({block:'center'})}},0)}
 function tkDel(id){
   const T=TA(),x=tkFind(id);if(!x)return;
-  if(!confirm('Delete "'+x.n.name+'"'+(tkSubs(x.n).length?' and everything inside it':'')+'? Its logged time will be hidden.'))return;
+  if(!confirm('Delete "'+(x.n.name||'Untitled')+'"'+(tkSubs(x.n).length?' and everything inside it':'')+'? Its logged time will be hidden.'))return;
   if(T.run&&tkIn(x.n,T.run.a))T.run=null;
   x.l.splice(x.i,1);save();tkRender()}
 setInterval(()=>{if(app==='time'&&!tkEdit&&TA().run)tkPaint()},1000);
