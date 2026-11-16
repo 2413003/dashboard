@@ -151,8 +151,14 @@ input[type=date]{color-scheme:dark}
 .tkk{margin:8px 0 0 14px;padding-left:12px;border-left:2px solid var(--c);display:flex;flex-direction:column;gap:8px}
 .tke{display:grid;grid-template-columns:22px minmax(0,1fr) 32px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)}
 .tkl{grid-column:2/-1;display:flex;align-items:center;gap:8px}
-.tkl input{width:80px}
-.tke select{background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:14px;padding:9px 8px;border-radius:8px}
+.tkl input{width:80px;font-size:16px}
+.tkn{position:relative;min-width:0}
+.tkn input{background:transparent;border-color:transparent;font-size:16px;font-weight:600;padding:9px 38px 9px 10px;transition:background .15s,border-color .15s}
+.tkn input::placeholder{color:var(--mu);font-weight:400}
+.tkn input:focus{outline:none;background:#1c1e24;border-color:#3a3d46}
+.tkclr{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;background:none;border:0;padding:4px;cursor:pointer;line-height:0}
+.tkn input:focus:not(:placeholder-shown)+.tkclr{display:flex}
+.tke select{background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:16px;padding:9px 8px;border-radius:8px}
 .tke .x{display:flex;align-items:center;justify-content:center;padding:7px 4px}
 .tkmn{position:fixed;z-index:11;background:#16181d;border:1px solid var(--ln);border-radius:12px;padding:6px;display:flex;flex-direction:column;min-width:170px;box-shadow:0 10px 30px #000a}
 .tkmn button{background:none;border:0;color:var(--fg);font:inherit;font-size:13px;text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer}
@@ -741,11 +747,13 @@ const tkVal=n=>tkU(n)==='h'?+(n.max/H1).toFixed(2):Math.round(n.max/6e4);
 const tkWarnTxt=n=>{const s=tkSubs(n),sum=s.reduce((a,c)=>a+c.max,0);return s.length&&sum>n.max+6e4?'Sub-activities add up to '+tkF(sum)+', more than the '+tkF(n.max)+' limit.':''};
 function tkRow(n,d,root){
   const u=tkU(n),w=tkWarnTxt(n);
-  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input id="tr-${n.id}" value="${esc(n.name)}" placeholder="Name" onchange="tkUp('${n.id}','name',this.value)"><button class="x" onclick="tkMenu(event,'${n.id}')" title="Options" aria-label="Options">${TK_DOTS}</button>
+  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><div class="tkn"><input id="tr-${n.id}" value="${esc(n.name)}" placeholder="Name" enterkeyhint="done" autocomplete="off" autocapitalize="words" spellcheck="false" onfocus="const i=this;setTimeout(()=>i.select(),0)" onkeydown="if(event.key==='Enter')this.blur()" onchange="tkUp('${n.id}','name',this.value)"><button class="tkclr" tabindex="-1" aria-label="Clear name" onmousedown="event.preventDefault()" onclick="tkClr('${n.id}')">${TK_CLR}</button></div><button class="x" onclick="tkMenu(event,'${n.id}')" title="Options" aria-label="Options">${TK_DOTS}</button>
     <div class="tkl"><span class="tks">Max per day</span><input id="tn-${n.id}" type="number" inputmode="decimal" min="0" step="${u==='h'?.25:5}" value="${tkVal(n)}" onchange="tkUp('${n.id}','max',this.value)"><select onchange="tkUnit('${n.id}',this.value)"><option value="m" ${u==='m'?'selected':''}>minutes</option><option value="h" ${u==='h'?'selected':''}>hours</option></select></div></div>`+
     `<div class="tks" id="tw-${n.id}" style="margin-left:${d*18}px;${w?'':'display:none'}">${w}</div>`+
     tkSubs(n).map(c=>tkRow(c,d+1,root)).join('');
 }
+const TK_CLR='<svg width="18" height="18" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="#8a8f9c"/><path d="M6.8 6.8l6.4 6.4M13.2 6.8l-6.4 6.4" stroke="#101114" stroke-width="1.8" stroke-linecap="round"/></svg>';
+function tkClr(id){const i=$('#tr-'+id);if(i){i.value='';i.focus()}tkUp(id,'name','')}
 const TK_DOTS='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>';
 function tkMenuClose(){const o=$('#tkmenu');if(o)o.remove()}
 function tkMenu(e,id){ // 3-dot menu: add a sub-activity or delete
