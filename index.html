@@ -684,7 +684,15 @@ try{tkOpen=new Set(JSON.parse(LS.getItem('tk_open')||'[]'))}catch(e){tkOpen=new 
 const dk=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const d0=k=>new Date(k+'T00:00').getTime();
 const dn=k=>{const d=new Date(d0(k));d.setDate(d.getDate()+1);return d.getTime()};
-const TA=()=>data.time||(data.time={acts:[],log:{},run:null});
+const TA=()=>{
+  const T=data.time||(data.time={acts:[],log:{},run:null});
+  if(!T._c){ // one-time clean-up: remove the five placeholder activities an earlier version saved (only if untouched and untracked)
+    T._c=1;
+    const A=T.acts||[],sig=A.map(a=>a.name+':'+a.max).join('|');
+    if(sig==='Work:'+6*H1+'|Exercise:'+H1+'|Learning:'+H1+'|Social media:'+.5*H1+'|TV:'+H1&&!Object.keys(T.log||{}).length&&!T.run&&A.every(a=>!(a.subs||[]).length)){T.acts=[];save()}
+  }
+  return T;
+};
 const tkKey=()=>tkDay||dk(Date.now());
 const tkSubs=n=>n.subs||(n.subs=[]);
 const tkIn=(n,id)=>n.id===id||tkSubs(n).some(c=>tkIn(c,id));
