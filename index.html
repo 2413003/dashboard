@@ -215,15 +215,42 @@ function balance(l,keep,target){
 const CFG={apiKey:"AIzaSyD9DTehb3lNWGcr6MbpsfOQ3I55hpwP7aI",authDomain:"dashboard-467f5.firebaseapp.com",projectId:"dashboard-467f5",appId:"1:1069570650154:web:65756f3f661d8c04a01353"};
 // =============================================
 let ref=null;
+let retry;
 function save(){
   data.updated=Date.now();
-  LS.setItem('pri_data',JSON.stringify(data));
+  try{LS.setItem('pri_data',JSON.stringify(data));LS.setItem('pri_dirty','1')}catch(e){} // a full browser store must never stop the cloud save
   status='wait';dots();clearTimeout(timer);timer=setTimeout(push,500);
 }
 async function push(){
-  if(!ref)return;
-  try{await ref.set({json:JSON.stringify(data),updated:data.updated});status='ok'}catch(e){status='err'}
+  if(!ref||!data.updated)return; // never write an untouched/empty copy over the account
+  const u=data.updated;
+  try{
+    await ref.set({json:JSON.stringify(data),updated:u});
+    if(data.updated===u){LS.removeItem('pri_dirty');status='ok'}
+  }catch(e){status='err';clearTimeout(retry);retry=setTimeout(push,15000)}
   dots();
+}
+// copies of your data kept in your account: one per day, plus one before anything could be overwritten
+function bk(tag){
+  if(!ref)return;
+  try{ref.collection('backups').doc(tag).set({json:JSON.stringify(data),updated:data.updated,at:Date.now()}).catch(()=>{})}catch(e){}
+}
+function dailyBk(){const t='auto-'+dk(Date.now());if(ref&&LS.getItem('pri_bk')!==t){LS.setItem('pri_bk',t);bk(t)}}
+function bkName(id){return id.startsWith('auto')?'Daily':id.startsWith('conflict')?'Before another device overwrote it':'Before a restore'}
+async function bkList(){
+  let q;try{q=await ref.collection('backups').orderBy('at','desc').limit(30).get()}catch(e){alert('Could not load backups.');return}
+  $('#md').innerHTML=`<div class="modal" onclick="if(event.target===this)this.remove()"><div class="box" style="max-height:80vh;overflow:auto"><b style="font-size:15px">Backups</b><p>Saved automatically every day, and before anything is overwritten. Tap one to restore it. Your current data is backed up first.</p>${q.docs.length?q.docs.map(d=>`<button class="t" style="text-align:left" onclick="bkRestore('${d.id}')">${new Date(d.data().at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${bkName(d.id)}</button>`).join(''):'<p>No backups yet.</p>'}<div class="btns"><button class="t" onclick="$('#md').innerHTML=''">Close</button></div></div></div>`;
+}
+async function bkRestore(id){
+  if(!confirm('Restore this backup? Your current data is backed up first.'))return;
+  const d=await ref.collection('backups').doc(id).get();if(!d.exists)return;
+  bk('restore-'+Date.now());
+  data=JSON.parse(d.data().json);save();syncUi();path=[];ten=false;prof=null;desc=false;$('#md').innerHTML='';render();
+}
+// view settings (Priorities focus mode, which Time activities are open) are kept in the account too
+function syncUi(){
+  if(data.ui&&typeof data.ui.focus==='boolean'){focus=data.ui.focus;LS.setItem('pri_focus',focus?'1':'0')}
+  if(data.time&&Array.isArray(data.time.open))tkOpen=new Set(data.time.open);
 }
 function dots(){
   const d=$('.dot');if(!d)return;
@@ -244,11 +271,14 @@ function init(){
     $('#md').innerHTML='';
     ref=fdb.collection('users').doc(u.uid);render();
     ref.onSnapshot(s=>{
-      if(!s.exists){push();return}
+      if(!s.exists){if(!s.metadata.fromCache&&data.updated)push();return} // never write defaults over an account we couldn't read
       const d=s.data();
-      if(d.updated>data.updated){data=JSON.parse(d.json);LS.setItem('pri_data',d.json);render();status='ok';dots()}
+      if(d.updated>data.updated){
+        if(LS.getItem('pri_dirty'))bk('conflict-'+Date.now()); // another device saved newer data: keep this device's unsynced copy first
+        data=JSON.parse(d.json);try{LS.setItem('pri_data',d.json)}catch(e){}LS.removeItem('pri_dirty');syncUi();render();status='ok';dots()}
       else if(d.updated<data.updated)push();
       else{status='ok';dots()}
+      if(!s.metadata.fromCache)dailyBk();
     });
   });
 }
@@ -557,7 +587,7 @@ function fstep(d){
   if(c.subs.length)setScore(c,t);else c.s=t;
   save();render();
 }
-function toggleFocus(){focus=!focus;LS.setItem('pri_focus',focus?'1':'0');path=[];edit=false;render()}
+function toggleFocus(){focus=!focus;LS.setItem('pri_focus',focus?'1':'0');(data.ui=data.ui||{}).focus=focus;save();path=[];edit=false;render()}
 function down(id){path=[...path,id];edit=false;render()}
 function up(){path=path.slice(0,-1);edit=false;render()}
 function upd(i,f,v){
@@ -593,12 +623,12 @@ function settings(){
   <div class="pp"><span class="av sm">${avHTML(u&&(u.displayName||u.email))}</span><div class="btns"><button class="t" onclick="$('#pf').click()">Change photo</button>${data.avatar?'<button class="t" onclick="rmAv()">Remove photo</button>':''}</div></div>
   <input id="pf" type="file" accept="image/*" hidden onchange="setAv(this.files[0]);this.value=''">
   <p>Signed in as ${u?esc(u.email):''}. Everything is saved to your account automatically.</p>
-  <div class="btns"><button class="t" onclick="dl()">Download backup</button><button class="t" onclick="$('#im').click()">Restore backup</button><button class="t" onclick="firebase.auth().signOut()">Sign out</button></div>
+  <div class="btns"><button class="t" onclick="dl()">Download backup</button><button class="t" onclick="bkList()">Backups</button><button class="t" onclick="$('#im').click()">Restore backup</button><button class="t" onclick="firebase.auth().signOut()">Sign out</button></div>
   <input id="im" type="file" accept=".json" hidden onchange="imp(this.files[0])">
   </div></div>`;
 }
 function dl(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));a.download='priorities-backup.json';a.click()}
-function imp(f){const r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();path=[];ten=false;prof=null;desc=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
+function imp(f){const r=new FileReader();r.onload=()=>{try{const nd=JSON.parse(r.result);bk('restore-'+Date.now());data=nd;save();path=[];ten=false;prof=null;desc=false;$('#md').innerHTML='';render()}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
 
 // ---- Home: AUM progress (Strava-style) + 9-dot apps menu. Change CUR to switch currency.
 let app='home', rng='all', cx=null;
@@ -746,7 +776,8 @@ function tkToggle(id){ // one tap: start; tap again: stop; tap another: switch
   if(!r||r.a!==id)TA().run={a:id,t:Date.now()};
   if(navigator.vibrate)navigator.vibrate(15);
   save();tkRender()}
-function tkTog(id){tkOpen.has(id)?tkOpen.delete(id):tkOpen.add(id);LS.setItem('tk_open',JSON.stringify([...tkOpen]));tkRender()}
+function tkSaveOpen(){LS.setItem('tk_open',JSON.stringify([...tkOpen]));TA().open=[...tkOpen];save()}
+function tkTog(id){tkOpen.has(id)?tkOpen.delete(id):tkOpen.add(id);tkSaveOpen();tkRender()}
 function tkAdd(id,m){tkRaw(id,tkKey(),m*6e4);save();tkPaint()}
 function tkNav(n){
   const d=new Date(d0(tkKey()));d.setDate(d.getDate()+n);const k=dk(d.getTime());
@@ -829,7 +860,7 @@ function tkUp(id,f,v){const x=tkFind(id);if(!x)return;const u=tkU(x.n);x.n.u=u;i
 function tkCol(id){const x=tkFind(id);if(!x)return;x.n.color=TKC[(TKC.indexOf(x.n.color)+1)%TKC.length];save();tkRender()}
 function tkNew(pid){
   const T=TA(),id=uid();
-  if(pid){const x=tkFind(pid);if(!x)return;tkSubs(x.n).push({id,name:'',max:H1/2,u:'m',subs:[]});tkOpen.add(pid);LS.setItem('tk_open',JSON.stringify([...tkOpen]))}
+  if(pid){const x=tkFind(pid);if(!x)return;tkSubs(x.n).push({id,name:'',max:H1/2,u:'m',subs:[]});tkOpen.add(pid);tkSaveOpen()}
   else T.acts.push({id,name:'',color:TKC[T.acts.length%TKC.length],max:H1,u:'h',subs:[]});
   save();tkRender();
   setTimeout(()=>{const i=$('#tr-'+id);if(i){i.focus();i.scrollIntoView({block:'center'})}},0)}
@@ -844,17 +875,17 @@ setInterval(()=>{if(app==='time'&&!tkEdit&&TA().run)tkPaint()},1000);
 let rfDay=null; // null = today
 const rfKey=()=>rfDay||dk(Date.now());
 const RF=()=>data.reflect||(data.reflect={});
-const rfN=r=>r?(r.g||[]).filter(x=>(x||'').trim()).length+((r.i||'').trim()?1:0):0;
+const rfN=r=>r?(r.g||[]).filter(x=>(x||'').trim()).length+((r.i||'').trim()?1:0)+((r.l||'').trim()?1:0):0;
 const rfLbl=k=>{
   const dd=Math.round((d0(dk(Date.now()))-d0(k))/864e5);
   if(dd<2)return['Today','Yesterday'][dd];
   const o={weekday:'short',day:'numeric',month:'short'};
   if(new Date(d0(k)).getFullYear()!==new Date().getFullYear())o.year='numeric';
   return new Date(d0(k)).toLocaleDateString('en-GB',o)};
-function rfProg(){const e=$('#rfp');if(!e)return;const n=rfN(RF()[rfKey()]);e.textContent=n===4?'All done':n?n+' of 4':''}
+function rfProg(){const e=$('#rfp');if(!e)return;const n=rfN(RF()[rfKey()]);e.textContent=n===5?'All done':n?n+' of 5':''}
 function rfSet(f,n,v){
   const k=rfKey(),R=RF(),r=R[k]||(R[k]={g:['','',''],i:''});
-  if(f==='g')r.g[n]=v;else r.i=v;
+  if(f==='g')r.g[n]=v;else r[f]=v;
   if(!rfN(r))delete R[k];
   save();rfProg()}
 function rfKeyd(e,t){ // Return moves to the next box (Shift+Return for a new line)
@@ -870,19 +901,22 @@ function rfRender(){
   const k=rfKey(),R=RF(),r=R[k]||{g:['','',''],i:''},today=!rfDay;
   $('#hd').innerHTML=`<h1>Reflect</h1>${GRIDB}<span class="dot" onclick="settings()"></span>`;
   dots();
-  const row=(f,n,ph,c,last)=>`<div class="rfl" style="--c:${c}"><span class="rfn">${f==='g'?n+1:'↑'}</span><textarea rows="1" placeholder="${ph}" enterkeyhint="${last?'done':'next'}" autocapitalize="sentences" oninput="rfSet('${f}',${n},this.value);grow(this)" onkeydown="rfKeyd(event,this)">${esc((f==='g'?r.g[n]:r.i)||'')}</textarea></div>`;
+  const row=(f,n,ph,c,last)=>`<div class="rfl" style="--c:${c}"><span class="rfn">${f==='g'?n+1:f==='i'?'↑':'✦'}</span><textarea rows="1" placeholder="${ph}" enterkeyhint="${last?'done':'next'}" autocapitalize="sentences" oninput="rfSet('${f}',${n},this.value);grow(this)" onkeydown="rfKeyd(event,this)">${esc((f==='g'?r.g[n]:r[f])||'')}</textarea></div>`;
   const past=Object.keys(R).filter(x=>x!==k&&rfN(R[x])).sort().reverse();
   const hist=past.map(x=>{
-    const e=R[x],ln=[...(e.g||[]).filter(t=>(t||'').trim()).map(t=>['#5fb87a',t]),...((e.i||'').trim()?[['#d9a441',e.i]]:[])];
+    const e=R[x],ln=[...(e.g||[]).filter(t=>(t||'').trim()).map(t=>['#5fb87a',t]),...((e.i||'').trim()?[['#d9a441',e.i]]:[]),...((e.l||'').trim()?[['#5b9bd5',e.l]]:[])];
     return `<div class="card rfk" onclick="rfGo('${x}')"><span class="rfd">${rfLbl(x)}</span>${ln.map(([c,t])=>`<div class="rft"><i style="background:${c}"></i><span>${esc(t)}</span></div>`).join('')}</div>`}).join('');
   $('#mn').innerHTML=`<div class="tkw"><div class="tknav"><button class="t ic" onclick="rfNav(-1)" aria-label="Previous day">‹</button><b>${rfLbl(k)}</b><button class="t ic" onclick="rfNav(1)" aria-label="Next day" ${today?'disabled':''}>›</button></div>
     <div class="tks" id="rfp" style="text-align:center;min-height:15px"></div>
-    <div class="card rfc"><div class="rfs">Three good things</div>${[0,1,2].map(n=>row('g',n,'Something good','#5fb87a',false)).join('')}<div class="rfs">One thing to improve</div>${row('i',0,'What could be better?','#d9a441',true)}</div>
+    <div class="card rfc"><div class="rfs">Three good things</div>${[0,1,2].map(n=>row('g',n,'Something good','#5fb87a',false)).join('')}<div class="rfs">One thing to improve</div>${row('i',0,'What could be better?','#d9a441',false)}<div class="rfs">One thing learned</div>${row('l',0,'What did you learn?','#5b9bd5',true)}</div>
     ${past.length?`<div class="rfs" style="padding-bottom:0">History</div>${hist}`:''}</div>`;
   document.querySelectorAll('#mn .rfl textarea').forEach(grow);
   rfProg();
 }
 
+function flush(){if(LS.getItem('pri_dirty')){clearTimeout(timer);push()}} // push at once when the page is hidden/closed or the connection returns
+addEventListener('pagehide',flush);addEventListener('online',flush);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flush()});
 addEventListener('resize',()=>{if(!edit&&!desc)render()});
 render();init();
 </script>
