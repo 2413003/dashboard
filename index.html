@@ -149,11 +149,15 @@ input[type=date]{color-scheme:dark}
 .tkq{display:flex;gap:6px}
 .tkq button{flex:1;padding:9px 0}
 .tkk{margin:8px 0 0 14px;padding-left:12px;border-left:2px solid var(--c);display:flex;flex-direction:column;gap:8px}
-.tke{display:grid;grid-template-columns:22px minmax(0,1fr) 28px 28px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)}
+.tke{display:grid;grid-template-columns:22px minmax(0,1fr) 32px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)}
 .tkl{grid-column:2/-1;display:flex;align-items:center;gap:8px}
 .tkl input{width:80px}
 .tke select{background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:14px;padding:9px 8px;border-radius:8px}
-.tke .x{font-size:20px}
+.tke .x{display:flex;align-items:center;justify-content:center;padding:7px 4px}
+.tkmn{position:fixed;z-index:11;background:#16181d;border:1px solid var(--ln);border-radius:12px;padding:6px;display:flex;flex-direction:column;min-width:170px;box-shadow:0 10px 30px #000a}
+.tkmn button{background:none;border:0;color:var(--fg);font:inherit;font-size:13px;text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer}
+.tkmn button:hover{background:#23252b}
+.tkmn .dg{color:#d9534f}
 .tkd{width:22px;height:22px;border-radius:50%;cursor:pointer}
 </style>
 </head>
@@ -737,10 +741,19 @@ const tkVal=n=>tkU(n)==='h'?+(n.max/H1).toFixed(2):Math.round(n.max/6e4);
 const tkWarnTxt=n=>{const s=tkSubs(n),sum=s.reduce((a,c)=>a+c.max,0);return s.length&&sum>n.max+6e4?'Sub-activities add up to '+tkF(sum)+', more than the '+tkF(n.max)+' limit.':''};
 function tkRow(n,d,root){
   const u=tkU(n),w=tkWarnTxt(n);
-  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input value="${esc(n.name)}" placeholder="Name" onchange="tkUp('${n.id}','name',this.value)"><button class="x" onclick="tkNew('${n.id}')" title="Add sub-activity">+</button><button class="x" onclick="tkDel('${n.id}')" title="Delete">×</button>
+  return `<div class="tke" style="margin-left:${d*18}px"><span class="tkd" style="background:${root.color};${d?'opacity:.5;width:12px;height:12px;justify-self:center':''}" ${d?'':`onclick="tkCol('${n.id}')"`}></span><input value="${esc(n.name)}" placeholder="Name" onchange="tkUp('${n.id}','name',this.value)"><button class="x" onclick="tkMenu(event,'${n.id}')" title="Options" aria-label="Options">${TK_DOTS}</button>
     <div class="tkl"><span class="tks">Max per day</span><input id="tn-${n.id}" type="number" inputmode="decimal" min="0" step="${u==='h'?.25:5}" value="${tkVal(n)}" onchange="tkUp('${n.id}','max',this.value)"><select onchange="tkUnit('${n.id}',this.value)"><option value="m" ${u==='m'?'selected':''}>minutes</option><option value="h" ${u==='h'?'selected':''}>hours</option></select></div></div>`+
     `<div class="tks" id="tw-${n.id}" style="margin-left:${d*18}px;${w?'':'display:none'}">${w}</div>`+
     tkSubs(n).map(c=>tkRow(c,d+1,root)).join('');
+}
+const TK_DOTS='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>';
+function tkMenuClose(){const o=$('#tkmenu');if(o)o.remove()}
+function tkMenu(e,id){ // 3-dot menu: add a sub-activity or delete
+  const o=$('#tkmenu'),same=o&&o.dataset.id===id;tkMenuClose();if(same)return;
+  const r=e.currentTarget.getBoundingClientRect(),d=document.createElement('div');
+  d.id='tkmenu';d.dataset.id=id;
+  d.innerHTML=`<div class="bk" onclick="tkMenuClose()"></div><div class="tkmn" style="top:${r.bottom+4}px;right:${Math.max(8,innerWidth-r.right)}px"><button onclick="tkMenuClose();tkNew('${id}')">Add sub-activity</button><button class="dg" onclick="tkMenuClose();tkDel('${id}')">Delete</button></div>`;
+  document.body.appendChild(d);
 }
 // edits update the data in place (no redraw), so a tap on + or × right after typing is never lost
 function tkWarn(){
@@ -757,9 +770,9 @@ function tkRender(){
   dots();
   if(tkEdit){
     const tot=T.acts.reduce((a,c)=>a+c.max,0);
-    m.innerHTML=`<div class="tkw"><p class="tks">Set the most time per day for each activity, in minutes or hours. Tap + to add a sub-activity inside one, and tap a colour to change it.</p>`+
+    m.innerHTML=`<div class="tkw">`+
       T.acts.map(a=>tkRow(a,0,a)).join('')+
-      `<button class="t add" onclick="tkNew()">+ Add activity</button><div class="tks" id="tkt">${tkF(tot)} allocated of 24h</div></div>`;
+      `<button class="t add" onclick="tkNew()" title="Add activity" aria-label="Add activity" style="font-size:16px;line-height:1;padding:8px 16px">+</button><div class="tks" id="tkt">${tkF(tot)} allocated of 24h</div></div>`;
     return}
   const dd=Math.round((d0(dk(Date.now()))-d0(k))/864e5),
     lbl=dd<2?['Today','Yesterday'][dd]:new Date(d0(k)).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
