@@ -179,6 +179,10 @@ input[type=date]{color-scheme:dark}
 .rfd{font-size:12px;color:var(--mu)}
 .rft{display:flex;gap:10px;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
 .rft i{flex:none;width:7px;height:7px;border-radius:50%;margin-top:8px}
+
+/* ---- Goals ---- */
+.box select{background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;width:100%}
+.glw{font-size:13px;color:var(--mu);line-height:1.5;white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -287,6 +291,7 @@ function render(){
   if(app==='home'){home();return}
   if(app==='time'){tkRender();return}
   if(app==='reflect'){rfRender();return}
+  if(app==='goals'){glRender();return}
   const c=cur();
   if(ten&&prof&&!pf())prof=null;
   $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="${prof?'prof=null':'ten=false;edit=false'};render()">‹</button><span id="ttl">${prof?esc((pf().name||'').trim()||'Untitled'):'What 10/10 looks like'}</span>`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
@@ -654,7 +659,8 @@ const APPS=[
   {id:'home',n:'Home',i:SV('<path d="M4 20V4M4 20h16M8 15l4-4 3 3 5-6"/>')},
   {id:'pri',n:'Priorities',i:SV('<rect x="3" y="3" width="11" height="11" rx="2"/><rect x="16" y="3" width="5" height="7" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="12" y="16" width="9" height="5" rx="1.5"/>')},
   {id:'time',n:'Time',i:SV('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>')},
-  {id:'reflect',n:'Reflect',i:SV('<path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M10 8h5M10 12h5"/>')}
+  {id:'reflect',n:'Reflect',i:SV('<path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M10 8h5M10 12h5"/>')},
+  {id:'goals',n:'Goals',i:SV('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>')}
 ];
 function menu(){
   const o=$('#ap');if(o){o.remove();return}
@@ -912,6 +918,62 @@ function rfRender(){
     ${past.length?`<div class="rfs" style="padding-bottom:0">History</div>${hist}`:''}</div>`;
   document.querySelectorAll('#mn .rfl textarea').forEach(grow);
   rfProg();
+}
+
+// ===== GOALS: specific, time-bound goals with built-in feedback =====
+const GL=()=>data.goals||(data.goals=[]);
+const glWk=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-(d.getDay()+6)%7);return d};
+const glWeek=(g,w)=>{let n=0;const s=w.getTime(),e=s+7*864e5;for(const k in g.log){const t=d0(k);if(t>=s&&t<e)n+=g.log[k]}return n};
+function glStreak(g){
+  const w=glWk(Date.now()),f=glWk(g.start).getTime();let s=glWeek(g,w)>=g.n?1:0;const p=new Date(w);
+  for(;;){p.setDate(p.getDate()-7);if(p.getTime()<f||glWeek(g,p)<g.n)break;s++}
+  return s}
+function glCard(g){
+  const id=g.id,u=esc(g.unit||''),why=g.why?`<p class="glw">${esc(g.why)}</p>`:'';
+  const x=`<button class="x fx" onclick="glDel('${id}')" title="Delete">×</button>`;
+  if(g.type==='p'){
+    const w=glWeek(g,glWk(Date.now())),td=g.log[dk(Date.now())]||0,st=glStreak(g);
+    return `<div class="card fe" style="--c:#5fb87a"><span class="fc-ch">Habit · every week</span><b style="font-size:16px;padding-right:24px">${esc(g.name)}</b>
+    <div class="tkr"><span class="tkv">${w} / ${g.n} ${u}</span><span class="tks">${w>=g.n?'Weekly goal hit':(g.n-w)+' to go this week'}</span></div>
+    <div class="tkb"><i style="width:${Math.min(100,w/g.n*100)}%"></i></div>
+    <span class="tks">${st?st+'-week streak · ':''}Today: ${td}</span>
+    <div class="tkq"><button class="t" onclick="glLog('${id}',-1)">−1</button><button class="t" onclick="glLog('${id}',1)">+1 today</button></div>${why}${x}</div>`}
+  const r=(g.n-g.from)||1,p=Math.max(0,Math.min(1,(g.v-g.from)/r)),due=d0(g.due)+864e5,now=Date.now(),
+    f=Math.max(0,Math.min(1,(now-g.start)/Math.max(due-g.start,1))),dl=Math.ceil((due-now)/864e5),done=p>=1,gap=p-f,
+    bad=!done&&dl>0&&gap<-.05,
+    msg=done?'Goal reached':dl<=0?'Deadline passed':gap>=.03?'Ahead of pace':gap>=-.05?'On pace':'Behind pace · need '+fmt(Math.abs(g.n-g.v)/dl)+' '+(g.unit||'')+'/day';
+  return `<div class="card fe" style="--c:${done?'#5fb87a':'#5b9bd5'}"><span class="fc-ch">Target · by ${fd(d0(g.due),1)}${dl>0&&!done?' · '+dl+' day'+(dl>1?'s':'')+' left':''}</span><b style="font-size:16px;padding-right:24px">${esc(g.name)}</b>
+    <div class="tkr"><span class="tkv">${fmt(g.v)} / ${fmt(g.n)} ${u}</span><span class="tks" style="${bad?'color:#d9534f':''}">${msg}</span></div>
+    <div class="tkb"><i style="width:${p*100}%"></i></div>
+    <div class="tkq"><button class="t" onclick="glUpd('${id}')">Update progress</button></div>${why}${x}</div>`;
+}
+function glRender(){
+  $('#hd').innerHTML=`<h1>Goals</h1><button class="t ic" onclick="glNew()" title="Add goal" aria-label="Add goal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>${GRIDB}<span class="dot" onclick="settings()"></span>`;
+  dots();
+  const l=GL();
+  $('#mn').innerHTML=`<div class="tkw">${l.length?l.map(glCard).join(''):`<div class="card" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start"><span class="tks">Set a specific goal with a number and, if it is a target, a deadline. Goals about what you do work better than goals about results.</span><button class="t" onclick="glNew()">+ Add your first goal</button></div>`}</div>`;
+}
+function glLog(id,d){const g=GL().find(x=>x.id===id);if(!g)return;const k=dk(Date.now()),n=Math.max(0,(g.log[k]||0)+d);n?g.log[k]=n:delete g.log[k];save();glRender()}
+function glUpd(id){const g=GL().find(x=>x.id===id);if(!g)return;const v=prompt('Current value'+(g.unit?' ('+g.unit+')':''),g.v);if(v===null)return;const n=parseFloat(v);if(isNaN(n))return;g.v=n;save();glRender()}
+function glDel(id){if(!confirm('Delete this goal?'))return;data.goals=GL().filter(x=>x.id!==id);save();glRender()}
+function glType(){$('#gx').style.display=$('#gt').value==='t'?'flex':'none'}
+function glNew(){
+  const t=dk(Date.now());
+  $('#md').innerHTML=`<div class="modal" onclick="if(event.target===this)this.remove()"><div class="box" style="max-height:90vh;overflow:auto"><b style="font-size:15px">New goal</b><p>Make it specific, hard but doable, and measurable. What you do beats what you hope happens.</p>
+  <input id="gn" placeholder="What exactly will you do?">
+  <select id="gt" onchange="glType()"><option value="p">Habit · a target every week</option><option value="t">Target · reach a number by a date</option></select>
+  <input id="gm" type="number" inputmode="decimal" placeholder="Target number"><input id="gu" placeholder="Unit (e.g. sessions, £, kg)">
+  <div id="gx" style="display:none;flex-direction:column;gap:12px"><input id="gf" type="number" inputmode="decimal" placeholder="Starting value (default 0)"><input id="gd" type="date" min="${t}"></div>
+  <input id="gw" placeholder="Why does it matter to you? (optional)">
+  <div class="btns"><button class="t" onclick="glSave()">Save</button><button class="t" onclick="$('#md').innerHTML=''">Cancel</button></div></div></div>`;
+  setTimeout(()=>{const i=$('#gn');if(i)i.focus()},0);
+}
+function glSave(){
+  const nm=$('#gn').value.trim(),ty=$('#gt').value,n=parseFloat($('#gm').value),f=parseFloat($('#gf').value)||0,d=$('#gd').value;
+  if(!nm||!(n>0)){alert('Enter a goal and a target number.');return}
+  if(ty==='t'&&(!d||n===f)){alert('Enter a deadline and a target different from the starting value.');return}
+  GL().push({id:uid(),name:nm,type:ty,n,unit:$('#gu').value.trim(),from:ty==='t'?f:0,v:ty==='t'?f:0,due:ty==='t'?d:null,why:$('#gw').value.trim(),start:Date.now(),log:{}});
+  $('#md').innerHTML='';save();glRender();
 }
 
 function flush(){if(LS.getItem('pri_dirty')){clearTimeout(timer);push()}} // push at once when the page is hidden/closed or the connection returns
