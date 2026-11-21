@@ -183,6 +183,16 @@ input[type=date]{color-scheme:dark}
 /* ---- Goals ---- */
 .box select{background:#181a1f;border:1px solid var(--ln);color:var(--fg);font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;width:100%}
 .glw{font-size:13px;color:var(--mu);line-height:1.5;white-space:pre-wrap}
+/* ---- Vision ---- */
+.vsg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.vst{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:14px 6px;border-radius:12px;background:#1c1e24}
+.vst b{font-size:13px;font-weight:600}
+.vsi{width:44px;height:44px;border-radius:50%;background:color-mix(in srgb,var(--c) 22%,transparent);color:var(--c);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+.vss{font-size:11px;color:var(--mu);line-height:1.4}
+.vsl{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--c)}
+.vsi.lg{width:52px;height:52px;border-radius:12px;background:#fff;padding:5px}
+.vsi img{width:100%;height:100%;object-fit:contain;display:block}
+.vst.ed{cursor:pointer;outline:1px dashed var(--ln)}
 </style>
 </head>
 <body>
@@ -292,6 +302,7 @@ function render(){
   if(app==='time'){tkRender();return}
   if(app==='reflect'){rfRender();return}
   if(app==='goals'){glRender();return}
+  if(app==='vision'){vsRender();return}
   const c=cur();
   if(ten&&prof&&!pf())prof=null;
   $('#hd').innerHTML=`<h1>${ten?`<button class="back" onclick="${prof?'prof=null':'ten=false;edit=false'};render()">‹</button><span id="ttl">${prof?esc((pf().name||'').trim()||'Untitled'):'What 10/10 looks like'}</span>`:desc?`<button class="back" onclick="desc=false;render()">‹</button>Description`:c?`<button class="back" onclick="${focus?'path=[];render()':'up()'}">‹</button>${focus?'Focus':esc(c.name)}`:focus?'Focus':'Priorities'}</h1>
@@ -660,7 +671,8 @@ const APPS=[
   {id:'pri',n:'Priorities',i:SV('<rect x="3" y="3" width="11" height="11" rx="2"/><rect x="16" y="3" width="5" height="7" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="12" y="16" width="9" height="5" rx="1.5"/>')},
   {id:'time',n:'Time',i:SV('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>')},
   {id:'reflect',n:'Reflect',i:SV('<path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M10 8h5M10 12h5"/>')},
-  {id:'goals',n:'Goals',i:SV('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>')}
+  {id:'goals',n:'Goals',i:SV('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>')},
+  {id:'vision',n:'Vision',i:SV('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>')}
 ];
 function menu(){
   const o=$('#ap');if(o){o.remove();return}
@@ -975,6 +987,46 @@ function glSave(){
   GL().push({id:uid(),name:nm,type:ty,n,unit:$('#gu').value.trim(),from:ty==='t'?f:0,v:ty==='t'?f:0,due:ty==='t'?d:null,why:$('#gw').value.trim(),start:Date.now(),log:{}});
   $('#md').innerHTML='';save();glRender();
 }
+
+// ===== VISION: the 9-dot future, with a full-screen visualise mode =====
+const VTXT=`Hello me. Visualise it.
+
+I open my 9-dot menu and see MK Ride giving free taxis, MK Food giving free food, MK Chess giving free chess, and MK Fund investing in MK businesses and the community.
+
+MK Fund is where the money is made. The other three build trust. Together they make me and my organisation the most trusted, reputable and liked person and organisation in MK, monopolising the taxi and food markets overnight and bringing me infinite money to manage through MK Fund, where the profit comes from.
+
+Future services: MK Help, which gives intel power, and MK Ads, which monopolises advertising in MK.`;
+const VAPPS=[['MK Ride','Free taxis','trust','R'],['MK Food','Free food','trust','F'],['MK Chess','Free chess','trust','C'],['MK Fund','Invests in MK businesses and community','profit','£'],['MK Help','Intel power','soon','H'],['MK Ads','All MK ads','soon','A']];
+const VC={trust:'#5fb87a',profit:'#d9a441',soon:'#8a8f9c'},VL={trust:'Builds trust',profit:'Makes the money',soon:'Future'};
+let vsEdit=false;
+const VS=()=>data.vision||(data.vision={text:VTXT});
+const VLOGO={'MK Chess':['https://mkchess.co.uk/assets/images/image18.svg?v=5de59123','https://mkchess.co.uk/assets/images/image01.svg?v=5de59123'],'MK Ride':['https://mkride.co.uk/assets/images/image01.png?v=560ff897']};
+let vsCur=null;
+const vsLogos=()=>VS().logos||(VS().logos={});
+function vsImg(a){const c=vsLogos()[a[0]],l=VLOGO[a[0]];return c?`<img src="${c}" alt="">`:l?`<img src="${l[0]}" alt="" referrerpolicy="no-referrer" onerror="vsErr(this,'${a[0]}')">`:a[3]}
+function vsErr(im,n){const l=VLOGO[n],i=(+im.dataset.i||0)+1;if(l&&l[i]){im.dataset.i=i;im.src=l[i]}else{const s=im.parentNode;s.classList.remove('lg');s.textContent=VAPPS.find(a=>a[0]===n)[3]}}
+const vsTiles=ed=>`<div class="vsg">${VAPPS.map(a=>{const custom=vsLogos()[a[0]],has=custom||VLOGO[a[0]];return `<div class="vst ${ed?'ed':''}" style="--c:${VC[a[2]]}" ${ed?`onclick="vsPick('${a[0]}')"`:''}><span class="vsi ${has?'lg':''}">${vsImg(a)}</span><b>${a[0]}</b><span class="vss">${a[1]}</span><span class="vsl">${VL[a[2]]}</span>${ed?`<span class="vss">Tap to change logo</span>${custom?`<button class="t" onclick="event.stopPropagation();vsReset('${a[0]}')">Reset logo</button>`:''}`:''}</div>`}).join('')}</div>`;
+function vsPng(f){return new Promise(res=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,192/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);res(cv.toDataURL('image/png'))};im.onerror=()=>res(null);im.src=u})}
+function vsPick(n){vsCur=n;$('#vsf').click()}
+async function vsSet(f){if(!f)return;const d=await vsPng(f);if(!d){alert('That file is not a valid image.');return}vsLogos()[vsCur]=d;save();vsRender()}
+function vsReset(n){delete vsLogos()[n];save();vsRender()}
+function vsRender(){
+  $('#hd').innerHTML=`<h1>Vision</h1><button class="t ic ${vsEdit?'on':''}" onclick="vsEdit=!vsEdit;vsRender()" title="${vsEdit?'Done':'Edit'}">${vsEdit?CHECK:PEN}</button>${GRIDB}<span class="dot" onclick="settings()"></span>`;
+  dots();
+  const v=VS();
+  $('#mn').innerHTML=`<div class="tkw"><div class="card">${vsTiles(vsEdit)}</div><input id="vsf" type="file" accept="image/*" hidden onchange="vsSet(this.files[0]);this.value=''">
+    ${vsEdit?`<textarea class="tx" oninput="VS().text=this.value;save();grow(this)">\n${esc(v.text)}</textarea>`:`<div class="tx">${esc(v.text)}</div>`}
+    <button class="t" style="padding:12px" onclick="vsGo()">Visualise it</button></div>`;
+  document.querySelectorAll('#mn textarea.tx').forEach(grow);
+}
+function vsGo(){
+  if($('#vsv'))return;
+  const z=document.createElement('div');z.id='vsv';
+  z.style.cssText='position:fixed;inset:0;z-index:30;background:var(--bg);overflow:auto;padding:24px 20px 40px';
+  z.innerHTML=`<div style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:22px"><div style="display:flex;justify-content:flex-end"><button class="t" onclick="vsClose()">Close</button></div>${vsTiles()}<div class="tx" style="font-size:17px;line-height:1.9;border:0;background:none;padding:0">${esc(VS().text)}</div></div>`;
+  document.body.appendChild(z);
+}
+function vsClose(){const z=$('#vsv');if(z)z.remove()}
 
 function flush(){if(LS.getItem('pri_dirty')){clearTimeout(timer);push()}} // push at once when the page is hidden/closed or the connection returns
 addEventListener('pagehide',flush);addEventListener('online',flush);
